@@ -43,7 +43,7 @@ services:
     restart: always
 
   apprise:
-    image: caronc/apprise:latest
+    image: caronc/apprise:2.0.1
     environment:
       - APPRISE_WORKER_COUNT=1
     restart: always

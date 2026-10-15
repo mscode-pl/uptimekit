@@ -46,7 +46,7 @@ services:
     restart: always
 
   apprise:
-    image: caronc/apprise:latest
+    image: caronc/apprise:2.0.1
     environment:
       - APPRISE_WORKER_COUNT=1
     restart: always
@@ -54,7 +54,7 @@ services:
   # Only needed when TIMESERIES_BACKEND=clickhouse (the default for this file).
   # Comment out this whole block if you switch to TimescaleDB.
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:26.9
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     environment:
