@@ -2,53 +2,17 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { BatchLinkPlugin, DedupeRequestsPlugin } from "@orpc/client/plugins";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import { QueryCache, QueryClient } from "@tanstack/react-query";
 import type { AppRouterClient } from "@uptimekit/api/routers/index";
-import { sileo } from "sileo";
-
-export const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            // Without a stale time every mount and window focus refetched every
-            // query. Mutations still invalidate explicitly, and live views set
-            // their own refetchInterval.
-            staleTime: 15_000,
-        },
-    },
-    queryCache: new QueryCache({
-        onError: (error, query) => {
-            sileo.action({
-                title: `Error: ${error.message}`,
-                button: {
-                    title: "Retry",
-                    onClick: () => {
-                        queryClient.refetchQueries({
-                            queryKey: query.queryKey,
-                            exact: true,
-                        });
-                    },
-                },
-            });
-        },
-    }),
-});
 
 export const link = new RPCLink({
-    url: () =>
-        `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/api/rpc`,
+    // Only the browser calls the API over HTTP; server components use the
+    // in-process router client from orpc.server.ts.
+    url: () => `${window.location.origin}/api/rpc`,
     fetch(url, options) {
         return fetch(url, {
             ...options,
             credentials: "include",
         });
-    },
-    headers: async () => {
-        if (typeof window !== "undefined") {
-            return {};
-        }
-
-        const { headers } = await import("next/headers");
-        return Object.fromEntries(await headers());
     },
     plugins: [
         new DedupeRequestsPlugin({

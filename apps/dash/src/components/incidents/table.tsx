@@ -28,12 +28,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-    parseAsInteger,
-    parseAsString,
-    parseAsStringEnum,
-    useQueryStates,
-} from "nuqs";
+import { useQueryStates } from "nuqs";
 import { useEffect, useRef, useState } from "react";
 import { sileo } from "sileo";
 import {
@@ -89,16 +84,11 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { client, orpc } from "@/utils/orpc";
-
-const PAGE_SIZE_OPTIONS = ["10", "25", "50", "100"] as const;
-const INCIDENT_STATUS_FILTERS = ["open", "resolved"] as const;
-const INCIDENT_SEVERITY_FILTERS = [
-    "minor",
-    "major",
-    "critical",
-    "maintenance",
-] as const;
-const INCIDENT_TYPE_FILTERS = ["manual", "automatic"] as const;
+import {
+    getIncidentsListInput,
+    incidentListSearchParams,
+    PAGE_SIZE_OPTIONS,
+} from "./list-query";
 
 type BulkIncidentAction = "acknowledge" | "resolve" | "delete";
 
@@ -256,16 +246,7 @@ function useIncidentsTableModel() {
     > | null>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [filters, setFilters] = useQueryStates({
-        search: parseAsString.withDefault(""),
-        status: parseAsStringEnum([...INCIDENT_STATUS_FILTERS]),
-        severity: parseAsStringEnum([...INCIDENT_SEVERITY_FILTERS]),
-        type: parseAsStringEnum([...INCIDENT_TYPE_FILTERS]),
-        monitorId: parseAsString,
-        statusPageId: parseAsString,
-        page: parseAsInteger.withDefault(1),
-        pageSize: parseAsStringEnum([...PAGE_SIZE_OPTIONS]).withDefault("25"),
-    });
+    const [filters, setFilters] = useQueryStates(incidentListSearchParams);
     const {
         search,
         status: statusFilter,
@@ -332,16 +313,11 @@ function useIncidentsTableModel() {
 
     const { data, isLoading } = useQuery(
         orpc.incidents.list.queryOptions({
-            input: {
-                status: statusFilter ?? "all",
-                limit: pageSize,
-                offset: (page - 1) * pageSize,
-                q: debouncedSearch || undefined,
-                severity: severityFilter ?? undefined,
-                type: typeFilter ?? undefined,
-                monitorId: monitorFilter ?? undefined,
-                statusPageId: statusPageFilter ?? undefined,
-            },
+            input: getIncidentsListInput({
+                ...filters,
+                page,
+                search: debouncedSearch,
+            }),
         }),
     );
     const { data: monitorsData } = useQuery({
