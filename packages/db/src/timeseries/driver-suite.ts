@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TimeSeriesDriver } from "./driver";
+import { SPARKLINE_LOOKBACK_MS } from "./types";
 
 function uid(label: string) {
     return `${label}-${crypto.randomUUID()}`;
@@ -951,6 +952,41 @@ export function defineDriverTests(
                 expect(
                     recent.every((point) => point.monitorId === monitorId),
                 ).toBe(true);
+            });
+
+            it("ignores events older than the sparkline lookback", async () => {
+                const driver = getDriver();
+                const monitorId = uid("sparkline-lookback");
+                const now = Date.now();
+
+                await driver.insertMonitorEvents([
+                    {
+                        id: crypto.randomUUID(),
+                        monitorId,
+                        status: "up",
+                        latency: 999,
+                        timestamp: new Date(
+                            now - SPARKLINE_LOOKBACK_MS - 60_000,
+                        ),
+                        location: "worker-stale",
+                    },
+                    {
+                        id: crypto.randomUUID(),
+                        monitorId,
+                        status: "up",
+                        latency: 100,
+                        timestamp: new Date(now - 1000),
+                        location: "worker-a",
+                    },
+                ]);
+
+                const recent = await driver.getRecentLatenciesByMonitor(
+                    [monitorId],
+                    10,
+                );
+
+                expect(recent).toHaveLength(1);
+                expect(recent[0]?.latency).toBe(100);
             });
 
             it("averages latency across workers per round", async () => {

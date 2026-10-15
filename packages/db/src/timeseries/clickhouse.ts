@@ -19,6 +19,7 @@ import type {
     StatusCodeDistributionQuery,
     WorkerStatus,
 } from "./types";
+import { SPARKLINE_LOOKBACK_MS } from "./types";
 
 interface BootstrapQuery {
     query: string;
@@ -737,6 +738,7 @@ export class ClickHouseDriver implements TimeSeriesDriver {
 						SELECT monitorId, location, latency, timestamp
 						FROM uptimekit.monitor_events
 						WHERE monitorId IN ({ids:Array(String)})
+							AND timestamp >= toDateTime64({since:UInt64} / 1000, 3)
 						ORDER BY monitorId, location, timestamp DESC
 						LIMIT {limit:UInt32} BY monitorId, location
 					)
@@ -744,7 +746,11 @@ export class ClickHouseDriver implements TimeSeriesDriver {
 				GROUP BY monitorId, rn
 				ORDER BY monitorId, timestamp ASC
 			`,
-            { ids: monitorIds, limit: limitPerMonitor },
+            {
+                ids: monitorIds,
+                limit: limitPerMonitor,
+                since: Date.now() - SPARKLINE_LOOKBACK_MS,
+            },
         );
 
         return rows.map((r) => ({
