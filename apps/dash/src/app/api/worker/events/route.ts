@@ -1,7 +1,7 @@
 import {
     authenticateWorker,
     isAuthError,
-    type MonitorEvent,
+    parseWorkerEvents,
     processMonitorEvents,
 } from "@uptimekit/api/pkg/worker";
 import { NextResponse } from "next/server";
@@ -127,7 +127,7 @@ async function handlePost(request: Request) {
             );
         }
 
-        const body = parsedBody as { events?: MonitorEvent[] };
+        const body = parsedBody as { events?: unknown };
         if (!body.events || !Array.isArray(body.events)) {
             return NextResponse.json(
                 { error: "Missing events array" },
@@ -144,12 +144,13 @@ async function handlePost(request: Request) {
             );
         }
 
-        const result = await processMonitorEvents(
+        const { events, rejected } = parseWorkerEvents(
             body.events,
             authResult.worker.id,
         );
+        const result = await processMonitorEvents(events, authResult.worker.id);
 
-        return NextResponse.json(result);
+        return NextResponse.json({ ...result, rejected });
     } finally {
         activeEventRequests--;
     }

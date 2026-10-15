@@ -1956,7 +1956,7 @@ export const monitorsRouter = {
     getBatchLatencySparkline: protectedProcedure
         .input(
             z.object({
-                monitorIds: z.array(z.string()),
+                monitorIds: z.array(z.string()).max(1000),
             }),
         )
         .handler(async ({ input, context }) => {

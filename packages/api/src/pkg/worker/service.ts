@@ -427,7 +427,12 @@ async function persistProcessedMonitorEventBatch(input: {
     groups: ProcessedMonitorEventBatch[];
     workerId: string;
 }) {
-    const { groups, workerId } = input;
+    const { workerId } = input;
+    // Groups without an organization were rejected (unknown monitor or a
+    // worker that is not assigned to it) and must not reach the time series.
+    const groups = input.groups.filter(
+        ({ processed }) => processed.organizationId !== null,
+    );
 
     await persistProcessedMonitorEventTimeSeries({
         changesToInsert: groups.flatMap(
@@ -701,6 +706,18 @@ async function processMonitorEventGroup(input: {
             },
             { database: tx },
         );
+
+    if (
+        !configuredWorkers.some(
+            (configuredWorker) => configuredWorker.id === workerId,
+        )
+    ) {
+        console.warn(
+            `Ignoring events for monitor ${monitorId} from unassigned worker ${workerId}`,
+        );
+        result.organizationId = null;
+        return result;
+    }
 
     const now = new Date();
     const activeMaintenance = await tx
