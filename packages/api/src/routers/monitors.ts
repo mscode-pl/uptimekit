@@ -676,10 +676,81 @@ export const monitorsRouter = {
                       .limit(input?.limit ?? 50)
                       .offset(input?.offset ?? 0);
 
-            const [monitors, total] = await Promise.all([
+            const [matchingMonitors, unfilteredTotal] = await Promise.all([
                 paginatedMonitorQuery,
                 db.$count(monitor, and(...filters)),
             ]);
+
+            type AggregateStatusSummary = {
+                status: string;
+                statusReason: string | null;
+                lastCheck: Date | null;
+            };
+            const loadAggregateStatuses = async (
+                rows: typeof matchingMonitors,
+            ) => {
+                const statuses = new Map<string, AggregateStatusSummary>();
+
+                try {
+                    const aggregateStatuses =
+                        await getAggregateMonitorStatusesForMonitors(
+                            rows.map((row) => ({
+                                id: row.monitor.id,
+                                workerIds:
+                                    (row.monitor.workerIds as
+                                        | string[]
+                                        | null) ?? [],
+                                locations:
+                                    (row.monitor.locations as
+                                        | string[]
+                                        | null) ?? [],
+                            })),
+                        );
+
+                    for (const [
+                        monitorId,
+                        aggregateStatus,
+                    ] of aggregateStatuses) {
+                        statuses.set(monitorId, {
+                            status: aggregateStatus.status,
+                            statusReason: aggregateStatus.statusReason,
+                            lastCheck: aggregateStatus.lastCheck,
+                        });
+                    }
+                } catch (error) {
+                    console.error(
+                        "[monitors.list] Failed to load aggregate monitor status",
+                        error,
+                    );
+                }
+
+                return statuses;
+            };
+
+            // Status is derived per monitor, so a status filter must evaluate
+            // every matching monitor; the per-row enrichment below then only
+            // runs for the page that is actually returned.
+            let monitors = matchingMonitors;
+            let total = unfilteredTotal;
+            let precomputedStatuses: Map<
+                string,
+                AggregateStatusSummary
+            > | null = null;
+
+            if (input?.status) {
+                precomputedStatuses =
+                    await loadAggregateStatuses(matchingMonitors);
+                const statusFilteredMonitors = matchingMonitors.filter(
+                    (row) =>
+                        (precomputedStatuses?.get(row.monitor.id)?.status ??
+                            "pending") === input.status,
+                );
+                total = statusFilteredMonitors.length;
+                monitors = statusFilteredMonitors.slice(
+                    input.offset,
+                    input.offset + input.limit,
+                );
+            }
 
             const monitorIds = monitors.map((row) => row.monitor.id);
             const createEmptyMonitorState = () => ({
@@ -695,45 +766,27 @@ export const monitorsRouter = {
             });
 
             const loadMonitorState = async () => {
+                const [latestChanges, aggregateStatusesMap] = await Promise.all(
+                    [
+                        timeseries
+                            .getLatestChangesForMonitors(monitorIds)
+                            .catch((error) => {
+                                console.error(
+                                    "[monitors.list] Failed to load latest monitor changes from time-series store",
+                                    error,
+                                );
+                                return [];
+                            }),
+                        precomputedStatuses ?? loadAggregateStatuses(monitors),
+                    ],
+                );
+
                 const monitorState = createEmptyMonitorState();
-
-                try {
-                    const monitorStatusInputs = monitors.map((row) => ({
-                        id: row.monitor.id,
-                        workerIds:
-                            (row.monitor.workerIds as string[] | null) ?? [],
-                        locations:
-                            (row.monitor.locations as string[] | null) ?? [],
-                    }));
-                    const [latestChanges, aggregateStatuses] =
-                        await Promise.all([
-                            timeseries.getLatestChangesForMonitors(monitorIds),
-                            getAggregateMonitorStatusesForMonitors(
-                                monitorStatusInputs,
-                            ),
-                        ]);
-
-                    for (const change of latestChanges) {
-                        monitorState.latestChangesMap.set(change.monitorId, {
-                            timestamp: change.timestamp,
-                        });
-                    }
-
-                    for (const [
-                        monitorId,
-                        aggregateStatus,
-                    ] of aggregateStatuses) {
-                        monitorState.aggregateStatusesMap.set(monitorId, {
-                            status: aggregateStatus.status,
-                            statusReason: aggregateStatus.statusReason,
-                            lastCheck: aggregateStatus.lastCheck,
-                        });
-                    }
-                } catch (error) {
-                    console.error(
-                        "[monitors.list] Failed to load latest monitor state from time-series store",
-                        error,
-                    );
+                monitorState.aggregateStatusesMap = aggregateStatusesMap;
+                for (const change of latestChanges) {
+                    monitorState.latestChangesMap.set(change.monitorId, {
+                        timestamp: change.timestamp,
+                    });
                 }
 
                 return monitorState;
@@ -857,21 +910,9 @@ export const monitorsRouter = {
                 };
             });
 
-            const statusFilteredMonitors = input?.status
-                ? monitorsWithStatus.filter(
-                      (item) => item.status === input.status,
-                  )
-                : monitorsWithStatus;
-            const result = input?.status
-                ? statusFilteredMonitors.slice(
-                      input.offset,
-                      input.offset + input.limit,
-                  )
-                : statusFilteredMonitors;
-
             return {
-                items: result,
-                total: input?.status ? statusFilteredMonitors.length : total,
+                items: monitorsWithStatus,
+                total,
             };
         }),
 
