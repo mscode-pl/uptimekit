@@ -1,6 +1,7 @@
 export {
     claimPendingEvents,
     cleanupAppEventOutbox,
+    deleteAppEvent,
     dispatchPersistedAppEvent,
     drainPendingEvents,
     ensureNotificationWorkerStarted,
