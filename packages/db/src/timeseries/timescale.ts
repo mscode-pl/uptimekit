@@ -18,6 +18,7 @@ import type {
     StatusCodeDistributionQuery,
     WorkerStatus,
 } from "./types";
+import { SPARKLINE_LOOKBACK_MS } from "./types";
 
 export interface TimescaleDriverOptions {
     url?: string;
@@ -702,6 +703,7 @@ export class TimescaleDriver implements TimeSeriesDriver {
         await this.ensureSchema();
 
         const sql = this.getClient();
+        const since = new Date(Date.now() - SPARKLINE_LOOKBACK_MS);
         const rows = await sql<
             { monitor_id: string; latency: number; timestamp: Date }[]
         >`
@@ -709,6 +711,7 @@ export class TimescaleDriver implements TimeSeriesDriver {
 				SELECT DISTINCT monitor_id, location
 				FROM monitor_events
 				WHERE monitor_id = ANY(${monitorIds})
+					AND timestamp >= ${since}
 			),
 			recent_events AS (
 				SELECT
@@ -725,6 +728,7 @@ export class TimescaleDriver implements TimeSeriesDriver {
 					FROM monitor_events AS monitor_event
 					WHERE monitor_event.monitor_id = monitor_locations.monitor_id
 						AND monitor_event.location IS NOT DISTINCT FROM monitor_locations.location
+						AND monitor_event.timestamp >= ${since}
 					ORDER BY monitor_event.timestamp DESC
 					LIMIT ${limitPerMonitor}
 				) event
@@ -848,6 +852,10 @@ export class TimescaleDriver implements TimeSeriesDriver {
 
         const sql = this.getClient();
 
+        // Dropping whole chunks is far cheaper than row deletes, especially for
+        // compressed chunks; the DELETE only touches the partially expired chunk.
+        await sql`SELECT drop_chunks('monitor_events', older_than => ${cutoff}::timestamptz)`;
+        await sql`SELECT drop_chunks('monitor_changes', older_than => ${cutoff}::timestamptz)`;
         await sql`DELETE FROM monitor_events WHERE timestamp < ${cutoff}`;
         await sql`DELETE FROM monitor_changes WHERE timestamp < ${cutoff}`;
     }

@@ -728,3 +728,7 @@ export const getMonitorStatus = async (monitorId: string) => {
         };
     });
 };
+
+export type StatusPageRecord = NonNullable<
+    Awaited<ReturnType<typeof getStatusPageBySlug>>
+>;

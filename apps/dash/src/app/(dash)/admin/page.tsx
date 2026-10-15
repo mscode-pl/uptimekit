@@ -15,7 +15,7 @@ import { monitor } from "@uptimekit/db/schema/monitors";
 import { worker } from "@uptimekit/db/schema/workers";
 import { formatDistanceToNow } from "date-fns";
 import { and, count, eq, isNull, lt, or } from "drizzle-orm";
-import WorkersMap from "@/components/admin/workers-map";
+import WorkersMap from "@/components/admin/lazy-workers-map";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRegionInfo, isFontAwesomeRegionFlag } from "@/lib/regions";

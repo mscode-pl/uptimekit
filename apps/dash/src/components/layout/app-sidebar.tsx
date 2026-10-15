@@ -14,7 +14,7 @@ import {
     faUser,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { authClient } from "@/lib/auth-client";
-import { orpc, queryClient } from "@/utils/orpc";
+import { orpc } from "@/utils/orpc";
 
 // import { UserMenu } from "@/components/layout/user-menu"; // Unused as we defined a local component for now to match structure
 
@@ -92,6 +92,7 @@ const configNav = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname();
     const router = useRouter(); // Use useRouter from next/navigation
+    const queryClient = useQueryClient();
     const [showCreateOrgModal, setShowCreateOrgModal] = React.useState(false);
     const isMounted = useHydrated();
 

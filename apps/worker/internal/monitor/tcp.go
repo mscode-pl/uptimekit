@@ -1,8 +1,8 @@
 package monitor
 
 import (
-	"fmt"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -19,7 +19,7 @@ func (m *TCPMonitor) Check(cfg Config) Result {
 	result := Result{
 		MonitorID: cfg.ID,
 		Status:    StatusDown,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: FormatTimestamp(time.Now()),
 	}
 
 	if cfg.Hostname == "" {
@@ -37,7 +37,7 @@ func (m *TCPMonitor) Check(cfg Config) Result {
 		timeout = 30 * time.Second
 	}
 
-	address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
+	address := tcpAddress(cfg.Hostname, cfg.Port)
 
 	// Measure connection time
 	start := time.Now()
@@ -54,4 +54,9 @@ func (m *TCPMonitor) Check(cfg Config) Result {
 
 	result.Status = StatusUp
 	return result
+}
+
+// tcpAddress builds a dial address, bracketing IPv6 literals.
+func tcpAddress(hostname string, port int) string {
+	return net.JoinHostPort(hostname, strconv.Itoa(port))
 }

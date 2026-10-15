@@ -5,6 +5,7 @@ import {
     isAutomaticIncidentOpenEligible,
     isAutomaticIncidentResolveEligible,
     type MonitorEvent,
+    mapWithConcurrency,
 } from "./service";
 
 function toMap(
@@ -345,5 +346,79 @@ describe("worker event retry identity", () => {
         expect(getStableMonitorEventId(event, "worker-a")).toBe(
             id.toLowerCase(),
         );
+    });
+});
+
+describe("mapWithConcurrency", () => {
+    it("preserves order and never exceeds the concurrency limit", async () => {
+        let running = 0;
+        let maxRunning = 0;
+
+        const results = await mapWithConcurrency(
+            [5, 1, 4, 2, 3, 1, 2],
+            3,
+            async (delay) => {
+                running++;
+                maxRunning = Math.max(maxRunning, running);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                running--;
+                return delay * 10;
+            },
+        );
+
+        expect(results).toEqual([50, 10, 40, 20, 30, 10, 20]);
+        expect(maxRunning).toBe(3);
+    });
+
+    it("handles empty input", async () => {
+        expect(await mapWithConcurrency([], 4, async () => 1)).toEqual([]);
+    });
+});
+
+describe("automatic incident recovery duration", () => {
+    const recoveredAt = new Date("2026-04-26T10:00:00Z");
+    const upSnapshot = (since: Date) => ({
+        status: "up" as const,
+        timestamp: new Date("2026-04-26T10:05:00Z"),
+        since,
+    });
+
+    it("waits until every worker has been up for the recovery duration", () => {
+        const input = {
+            configuredWorkerIds: ["worker-a", "worker-b"],
+            workerStatusById: new Map([
+                ["worker-a", upSnapshot(recoveredAt)],
+                ["worker-b", upSnapshot(new Date("2026-04-26T10:02:00Z"))],
+            ]),
+            activeIncident: { id: "incident-1" },
+            incidentRecoveryDurationSeconds: 300,
+        };
+
+        expect(
+            isAutomaticIncidentResolveEligible({
+                ...input,
+                eventTime: new Date("2026-04-26T10:06:00Z"),
+            }),
+        ).toBe(false);
+        expect(
+            isAutomaticIncidentResolveEligible({
+                ...input,
+                eventTime: new Date("2026-04-26T10:07:00Z"),
+            }),
+        ).toBe(true);
+    });
+
+    it("resolves immediately when no recovery duration is configured", () => {
+        expect(
+            isAutomaticIncidentResolveEligible({
+                configuredWorkerIds: ["worker-a"],
+                workerStatusById: new Map([
+                    ["worker-a", upSnapshot(recoveredAt)],
+                ]),
+                activeIncident: { id: "incident-1" },
+                eventTime: recoveredAt,
+                incidentRecoveryDurationSeconds: 0,
+            }),
+        ).toBe(true);
     });
 });

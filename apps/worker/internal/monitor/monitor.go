@@ -1,5 +1,7 @@
 package monitor
 
+import "time"
+
 // Monitor is the interface that all monitor types must implement.
 // Each monitor type (HTTP, TCP, ICMP, etc.) implements this interface.
 type Monitor interface {
@@ -28,6 +30,13 @@ type Config struct {
 	Keyword             string      `json:"keyword,omitempty"`       // For keyword monitor
 	JSONPath            string      `json:"jsonPath,omitempty"`      // For JSON monitor
 	ExpectedValue       string      `json:"expectedValue,omitempty"` // For DNS expected answer and JSON value validation
+	CheckSSL            *bool       `json:"checkSsl,omitempty"`      // Report certificate expiry; defaults to true
+}
+
+// ShouldReportCertificate reports whether certificate details should be sent
+// for this monitor. Older dashboards omit the field, which means enabled.
+func (c *Config) ShouldReportCertificate() bool {
+	return c.CheckSSL == nil || *c.CheckSSL
 }
 
 // GetHeaders returns headers as map[string]string, handling various API formats.
@@ -72,14 +81,27 @@ type CertificateInfo struct {
 
 // Result represents the outcome of a monitor check.
 type Result struct {
-	MonitorID       string           `json:"monitorId"`
-	Status          string           `json:"status"` // "up" or "down"
-	Latency         int64            `json:"latency"`
-	Timings         *Timings         `json:"timings,omitempty"`
-	StatusCode      int              `json:"statusCode,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	Timestamp       string           `json:"timestamp"`
-	CertificateInfo *CertificateInfo `json:"certificateInfo,omitempty"`
+	// ID uniquely identifies the check so the dashboard can deduplicate
+	// retried deliveries exactly.
+	ID         string   `json:"id,omitempty"`
+	MonitorID  string   `json:"monitorId"`
+	Status     string   `json:"status"` // "up" or "down"
+	Latency    int64    `json:"latency"`
+	Timings    *Timings `json:"timings,omitempty"`
+	StatusCode int      `json:"statusCode,omitempty"`
+	Error      string   `json:"error,omitempty"`
+	Timestamp  string   `json:"timestamp"`
+	// CertificateInfo is delivered through its own endpoint, not with events.
+	CertificateInfo *CertificateInfo `json:"-"`
+}
+
+// TimestampFormat keeps millisecond precision so checks within the same
+// second stay distinct.
+const TimestampFormat = "2006-01-02T15:04:05.000Z07:00"
+
+// FormatTimestamp renders t in UTC using TimestampFormat.
+func FormatTimestamp(t time.Time) string {
+	return t.UTC().Format(TimestampFormat)
 }
 
 // Status constants

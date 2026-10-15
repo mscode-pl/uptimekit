@@ -19,6 +19,9 @@ export const SWEEP_INTERVAL_MS = 30_000;
 const MAX_RETRY_DELAY_MS = 15 * 60 * 1000;
 const BASE_RETRY_DELAY_MS = 30_000;
 const DEFAULT_BATCH_SIZE = 25;
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+const CLEANUP_BATCH_SIZE = 5_000;
+const TIMESERIES_PERSIST_EVENT: AppEventName = "monitor.timeseries.persist";
 
 export interface AppEventOutboxRow {
     id: string;
@@ -173,6 +176,27 @@ export async function markEventProcessed(
 	`;
 }
 
+/**
+ * Time-series persistence rows carry a full copy of the check results and have
+ * no audit value once written, so they are deleted instead of kept as
+ * `processed`.
+ */
+export async function deleteAppEvent(
+    id: string,
+    sql: NotificationSqlClient = postgresClient,
+) {
+    await sql`delete from app_event_outbox where id = ${id}`;
+}
+
+function completeAppEvent(
+    row: Pick<AppEventOutboxRow, "id" | "event_name">,
+    sql: NotificationSqlClient = postgresClient,
+) {
+    return row.event_name === TIMESERIES_PERSIST_EVENT
+        ? deleteAppEvent(row.id, sql)
+        : markEventProcessed(row.id, sql);
+}
+
 export async function markEventFailed(
     input: {
         id: string;
@@ -224,7 +248,9 @@ export async function processAppEventRow(
 ) {
     const event = mapOutboxRowToEvent(row);
     const dispatchEvent = deps.dispatchEvent ?? dispatchPersistedAppEvent;
-    const markProcessed = deps.markProcessed ?? markEventProcessed;
+    const markProcessed =
+        deps.markProcessed ??
+        ((id: string) => completeAppEvent({ id, event_name: row.event_name }));
     const markFailed =
         deps.markFailed ??
         ((input) =>
@@ -274,7 +300,8 @@ export async function drainPendingEvents(input: {
                         { ...failure, eventName: row.event_name },
                         sql,
                     ),
-                markProcessed: (id) => markEventProcessed(id, sql),
+                markProcessed: (id) =>
+                    completeAppEvent({ id, event_name: row.event_name }, sql),
             });
             processed++;
         }
@@ -291,23 +318,44 @@ export async function cleanupAppEventOutbox(
     const sql = input.sql ?? postgresClient;
     const processedOlderThanDays = input.processedOlderThanDays ?? 7;
     const failedOlderThanDays = input.failedOlderThanDays ?? 30;
+    let deleted = 0;
 
-    await sql`
-		delete from app_event_outbox
-		where (
-			status = 'processed'
-			and processed_at < now() - (${processedOlderThanDays} * interval '1 day')
-		) or (
-			status = 'failed'
-			and updated_at < now() - (${failedOlderThanDays} * interval '1 day')
-		)
-	`;
+    // Delete in bounded batches so a large backlog never holds one long
+    // transaction, and skip rows another replica is already deleting.
+    while (true) {
+        const result = await sql`
+			delete from app_event_outbox
+			where id in (
+				select id
+				from app_event_outbox
+				where (
+					status = 'processed'
+					and (
+						event_name = ${TIMESERIES_PERSIST_EVENT}
+						or processed_at < now() - (${processedOlderThanDays} * interval '1 day')
+					)
+				) or (
+					status = 'failed'
+					and updated_at < now() - (${failedOlderThanDays} * interval '1 day')
+				)
+				limit ${CLEANUP_BATCH_SIZE}
+				for update skip locked
+			)
+		`;
+        const count = result?.count ?? 0;
+        deleted += count;
+
+        if (count < CLEANUP_BATCH_SIZE) {
+            return deleted;
+        }
+    }
 }
 
 export class PostgresNotificationWorker {
     private readonly workerId: string;
     private readonly sql: NotificationSqlClient;
     private sweepInterval: ReturnType<typeof setInterval> | undefined;
+    private cleanupInterval: ReturnType<typeof setInterval> | undefined;
     private unlisten: (() => Promise<void>) | undefined;
     private drainPromise: Promise<void> | undefined;
 
@@ -338,7 +386,27 @@ export class PostgresNotificationWorker {
         );
         this.sweepInterval.unref?.();
 
+        this.cleanupInterval = setInterval(
+            () => void this.cleanup(),
+            CLEANUP_INTERVAL_MS,
+        );
+        this.cleanupInterval.unref?.();
+
         await this.drain();
+        void this.cleanup();
+    }
+
+    async cleanup() {
+        try {
+            const deleted = await cleanupAppEventOutbox({ sql: this.sql });
+            if (deleted > 0) {
+                logger.info(
+                    `Removed ${deleted} completed app event${deleted === 1 ? "" : "s"}`,
+                );
+            }
+        } catch (error) {
+            logger.error("Failed to clean up app events", error);
+        }
     }
 
     async drain() {
@@ -371,6 +439,11 @@ export class PostgresNotificationWorker {
         if (this.sweepInterval) {
             clearInterval(this.sweepInterval);
             this.sweepInterval = undefined;
+        }
+
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = undefined;
         }
 
         if (this.unlisten) {

@@ -121,10 +121,9 @@ export const workersRouter = {
                         createdAt: worker.createdAt,
                         updatedAt: worker.updatedAt,
                         monitorCount: sql<number>`(
-								SELECT COUNT(DISTINCT "monitor"."id")
+								SELECT COUNT(*)
 								FROM ${monitor}
-								CROSS JOIN LATERAL json_array_elements_text("monitor"."locations") AS location(location)
-								WHERE location.location = ${worker.location}
+								WHERE "monitor"."locations" @> jsonb_build_array(${worker.location})
 							)`
                             .mapWith(Number)
                             .as("monitor_count"),
@@ -247,7 +246,7 @@ export const workersRouter = {
                         })
                         .from(monitor)
                         .where(
-                            sql`${monitor.workerIds}::jsonb @> ${JSON.stringify([input.id])}::jsonb`,
+                            sql`${monitor.workerIds} @> ${JSON.stringify([input.id])}::jsonb`,
                         );
 
                     const assignedWorkerIds = [
@@ -404,7 +403,7 @@ export const workersRouter = {
                     .select()
                     .from(monitor)
                     .where(
-                        sql`${monitor.workerIds}::jsonb @> ${JSON.stringify([input.id])}::jsonb`,
+                        sql`${monitor.workerIds} @> ${JSON.stringify([input.id])}::jsonb`,
                     );
 
                 const uniqueNextWorkerIds = new Set<string>();

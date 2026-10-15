@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { db, timeseries } from "@uptimekit/db";
+import { db } from "@uptimekit/db";
 import {
     incident,
     incidentActivity,
@@ -12,6 +12,11 @@ import { worker } from "@uptimekit/db/schema/workers";
 import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { type AppEventPayload, publishAppEvent } from "../../lib/events";
 import {
+    getLatestMonitorLocationStatuses,
+    type MonitorLocationStatus,
+    recordMonitorLocationStatuses,
+} from "../../lib/monitor-location-state";
+import {
     type AutomaticIncidentOpenEvaluation,
     type ConfiguredWorkerStateResult,
     getAggregateMonitorStatus,
@@ -21,10 +26,7 @@ import {
     isAutomaticIncidentResolveEligible,
     type WorkerStatusSnapshot,
 } from "../../lib/monitor-status";
-import {
-    markEventProcessed,
-    processPendingNotifications,
-} from "../notifications";
+import { deleteAppEvent, processPendingNotifications } from "../notifications";
 import {
     getMonitorEventMetadata,
     invalidateMonitorEventMetadataCache,
@@ -80,6 +82,7 @@ interface ProcessedMonitorEventGroup {
     incidentStatusPagesToInsert: (typeof incidentStatusPage.$inferInsert)[];
     activitiesToInsert: (typeof incidentActivity.$inferInsert)[];
     eventsToDispatch: WorkerIncidentEventDispatch[];
+    locationStatuses: MonitorLocationStatus[];
 }
 
 interface ProcessedMonitorEventBatch {
@@ -104,6 +107,7 @@ type WorkerIncidentEventDispatch =
       };
 
 const monitorEventLocks = new Map<string, Promise<void>>();
+const MONITOR_GROUP_CONCURRENCY = 4;
 type TransactionLike = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type AutomaticIncidentTriggerStatus = "down" | "degraded";
 type EffectiveMonitorWorkers = Awaited<
@@ -244,6 +248,28 @@ function getAutomaticIncidentEscalatedMessage(input: {
     return details.join(" ");
 }
 
+export async function mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    const runNext = async (): Promise<void> => {
+        while (nextIndex < items.length) {
+            const index = nextIndex++;
+            results[index] = await fn(items[index] as T);
+        }
+    };
+
+    await Promise.all(
+        Array.from({ length: Math.min(concurrency, items.length) }, runNext),
+    );
+
+    return results;
+}
+
 async function withMonitorEventLock<T>(
     monitorId: string,
     fn: (tx: TransactionLike) => Promise<T>,
@@ -285,6 +311,10 @@ async function persistProcessedMonitorEventGroup(input: {
     tx: TransactionLike;
 }) {
     const { processed, tx } = input;
+
+    await recordMonitorLocationStatuses(processed.locationStatuses, {
+        database: tx,
+    });
 
     if (processed.incidentsToInsert.length > 0) {
         await tx.insert(incident).values(processed.incidentsToInsert);
@@ -397,7 +427,12 @@ async function persistProcessedMonitorEventBatch(input: {
     groups: ProcessedMonitorEventBatch[];
     workerId: string;
 }) {
-    const { groups, workerId } = input;
+    const { workerId } = input;
+    // Groups without an organization were rejected (unknown monitor or a
+    // worker that is not assigned to it) and must not reach the time series.
+    const groups = input.groups.filter(
+        ({ processed }) => processed.organizationId !== null,
+    );
 
     await persistProcessedMonitorEventTimeSeries({
         changesToInsert: groups.flatMap(
@@ -411,7 +446,7 @@ async function persistProcessedMonitorEventBatch(input: {
         groups
             .map(({ timeseriesOutboxId }) => timeseriesOutboxId)
             .filter((id): id is string => id !== null)
-            .map((id) => markEventProcessed(id)),
+            .map((id) => deleteAppEvent(id)),
     );
 
     if (groups.some(({ processed }) => processed.eventsToDispatch.length > 0)) {
@@ -451,10 +486,10 @@ export async function getMonitorsForWorker(workerId: string) {
         where: and(
             eq(monitor.active, true),
             or(
-                sql`${monitor.workerIds}::jsonb @> ${JSON.stringify([workerId])}::jsonb`,
+                sql`${monitor.workerIds} @> ${JSON.stringify([workerId])}::jsonb`,
                 and(
-                    sql`coalesce(${monitor.workerIds}::jsonb, '[]'::jsonb) = '[]'::jsonb`,
-                    sql`${monitor.locations}::jsonb @> ${JSON.stringify([workerRecord.location])}::jsonb`,
+                    sql`${monitor.workerIds} = '[]'::jsonb`,
+                    sql`${monitor.locations} @> ${JSON.stringify([workerRecord.location])}::jsonb`,
                 ),
             ),
         ),
@@ -536,45 +571,53 @@ export async function processMonitorEvents(
         eventsByMonitor.set(event.monitorId, list);
     }
 
-    const processedGroups: ProcessedMonitorEventBatch[] = [];
-
-    for (const [monitorId, monitorEvents] of eventsByMonitor.entries()) {
-        const groupResult = await withMonitorEventLock(
+    // Groups touch disjoint monitors and each holds its own monitor lock, so
+    // they can run side by side; the cap keeps one batch from monopolizing
+    // the shared connection pool.
+    const processedGroups = await mapWithConcurrency(
+        [...eventsByMonitor.entries()],
+        MONITOR_GROUP_CONCURRENCY,
+        async ([
             monitorId,
-            async (tx) => {
-                const processedGroup = await processMonitorEventGroup({
-                    monitorId,
-                    monitorEvents,
-                    workerId,
-                    tx,
-                });
-
-                await persistProcessedMonitorEventGroup({
-                    processed: processedGroup,
-                    tx,
-                });
-
-                // Keep the relational result and its time-series recovery
-                // record in the same transaction so a process crash cannot
-                // commit one without the other.
-                const timeseriesOutboxId =
-                    await enqueueProcessedMonitorEventGroup({
-                        processed: processedGroup,
+            monitorEvents,
+        ]): Promise<ProcessedMonitorEventBatch> => {
+            const groupResult = await withMonitorEventLock(
+                monitorId,
+                async (tx) => {
+                    const processedGroup = await processMonitorEventGroup({
+                        monitorId,
                         monitorEvents,
                         workerId,
                         tx,
                     });
 
-                return { processedGroup, timeseriesOutboxId };
-            },
-        );
+                    await persistProcessedMonitorEventGroup({
+                        processed: processedGroup,
+                        tx,
+                    });
 
-        processedGroups.push({
-            processed: groupResult.processedGroup,
-            monitorEvents,
-            timeseriesOutboxId: groupResult.timeseriesOutboxId,
-        });
-    }
+                    // Keep the relational result and its time-series recovery
+                    // record in the same transaction so a process crash cannot
+                    // commit one without the other.
+                    const timeseriesOutboxId =
+                        await enqueueProcessedMonitorEventGroup({
+                            processed: processedGroup,
+                            monitorEvents,
+                            workerId,
+                            tx,
+                        });
+
+                    return { processedGroup, timeseriesOutboxId };
+                },
+            );
+
+            return {
+                processed: groupResult.processedGroup,
+                monitorEvents,
+                timeseriesOutboxId: groupResult.timeseriesOutboxId,
+            };
+        },
+    );
 
     await persistProcessedMonitorEventBatch({
         groups: processedGroups,
@@ -607,6 +650,7 @@ async function processMonitorEventGroup(input: {
         incidentStatusPagesToInsert: [],
         activitiesToInsert: [],
         eventsToDispatch: [],
+        locationStatuses: [],
     };
 
     const cachedMetadata = getMonitorEventMetadata(monitorId);
@@ -662,6 +706,18 @@ async function processMonitorEventGroup(input: {
             },
             { database: tx },
         );
+
+    if (
+        !configuredWorkers.some(
+            (configuredWorker) => configuredWorker.id === workerId,
+        )
+    ) {
+        console.warn(
+            `Ignoring events for monitor ${monitorId} from unassigned worker ${workerId}`,
+        );
+        result.organizationId = null;
+        return result;
+    }
 
     const now = new Date();
     const activeMaintenance = await tx
@@ -732,13 +788,16 @@ async function processMonitorEventGroup(input: {
         ]),
     );
 
-    const latestWorkerStatuses =
-        await timeseries.getLatestStatusPerLocation(monitorId);
+    const latestWorkerStatuses = await getLatestMonitorLocationStatuses(
+        [monitorId],
+        { database: tx },
+    );
     const workerStatusById = new Map<string, WorkerStatusSnapshot>();
     for (const workerStatus of latestWorkerStatuses) {
         workerStatusById.set(workerStatus.location, {
             status: workerStatus.status as MonitorEvent["status"],
             timestamp: workerStatus.timestamp,
+            since: workerStatus.statusSince ?? workerStatus.timestamp,
         });
     }
 
@@ -755,9 +814,23 @@ async function processMonitorEventGroup(input: {
         const eventTime = new Date(event.timestamp);
         const eventWorkerId = event.location || workerId;
 
+        const previousWorkerStatus = workerStatusById.get(eventWorkerId);
+        const statusSince =
+            previousWorkerStatus?.status === event.status
+                ? (previousWorkerStatus.since ?? previousWorkerStatus.timestamp)
+                : eventTime;
+
         workerStatusById.set(eventWorkerId, {
             status: event.status,
             timestamp: eventTime,
+            since: statusSince,
+        });
+        result.locationStatuses.push({
+            monitorId,
+            location: eventWorkerId,
+            status: event.status,
+            timestamp: eventTime,
+            statusSince,
         });
 
         const aggregateStatus = getAggregateMonitorStatus({
@@ -788,6 +861,9 @@ async function processMonitorEventGroup(input: {
                 configuredWorkerIds,
                 workerStatusById,
                 activeIncident,
+                eventTime,
+                incidentRecoveryDurationSeconds:
+                    monitorConfig.incidentRecoveryDuration,
             })
         ) {
             const resolvedIncident = activeIncident;
@@ -1004,7 +1080,5 @@ async function processMonitorEventGroup(input: {
         }
     }
 
-    // `incidentRecoveryDuration` exists on the monitor schema but remains intentionally
-    // unused here so this fix only changes multi-worker incident gating behavior.
     return result;
 }

@@ -25,7 +25,7 @@ func (m *JSONMonitor) Check(cfg Config) Result {
 	result := Result{
 		MonitorID: cfg.ID,
 		Status:    StatusDown,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: FormatTimestamp(time.Now()),
 	}
 
 	if cfg.URL == "" {
@@ -67,9 +67,7 @@ func (m *JSONMonitor) Check(cfg Config) Result {
 
 	req.Header.Set("User-Agent", "UptimeKit-Worker/1.0 (+https://uptimekit.dev)")
 
-	client := &http.Client{
-		Timeout: timeout,
-	}
+	client := newCheckClient(timeout)
 
 	start := time.Now()
 	resp, err := client.Do(req)
@@ -92,9 +90,13 @@ func (m *JSONMonitor) Check(cfg Config) Result {
 	}
 
 	// Read and parse JSON
-	body, err := io.ReadAll(resp.Body)
+	body, truncated, err := readLimitedBody(resp.Body)
 	if err != nil {
 		result.Error = "failed to read response: " + err.Error()
+		return result
+	}
+	if truncated {
+		result.Error = bodyTooLargeError()
 		return result
 	}
 

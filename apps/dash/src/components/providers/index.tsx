@@ -3,7 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Toaster } from "sileo";
-import { queryClient } from "@/utils/orpc";
+import { getQueryClient } from "@/utils/query-client";
 import { StatusPageDomainProvider } from "./status-page-domain-provider";
 import { ThemeProvider } from "./theme-provider";
 
@@ -23,7 +23,7 @@ export default function Providers({
                 disableTransitionOnChange
             >
                 <NuqsAdapter>
-                    <QueryClientProvider client={queryClient}>
+                    <QueryClientProvider client={getQueryClient()}>
                         {children}
                     </QueryClientProvider>
                     <Toaster position="top-center" theme="light" />

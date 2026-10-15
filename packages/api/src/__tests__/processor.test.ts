@@ -66,6 +66,16 @@ describe("notification outbox processor", () => {
         }
     });
 
+    it("deletes outbox rows in batches until the backlog is drained", async () => {
+        const counts = [5_000, 5_000, 12];
+        const sql = vi.fn(async () => ({ count: counts.shift() ?? 0 })) as any;
+
+        const deleted = await cleanupAppEventOutbox({ sql });
+
+        expect(deleted).toBe(10_012);
+        expect(sql).toHaveBeenCalledTimes(3);
+    });
+
     it("dispatches an event row and marks it processed", async () => {
         const dispatchEvent = vi.fn(async () => undefined);
         const markProcessed = vi.fn(async () => undefined);

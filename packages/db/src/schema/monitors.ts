@@ -4,7 +4,9 @@ import {
     index,
     integer,
     json,
+    jsonb,
     pgTable,
+    primaryKey,
     text,
     timestamp,
 } from "drizzle-orm/pg-core";
@@ -62,8 +64,8 @@ export const monitor = pgTable(
         publishIncidentToStatusPage: boolean("publish_incident_to_status_page")
             .default(false)
             .notNull(),
-        locations: json("locations").$type<string[]>().notNull(), // array of worker locations
-        workerIds: json("worker_ids").$type<string[]>().notNull(),
+        locations: jsonb("locations").$type<string[]>().notNull(), // array of worker locations
+        workerIds: jsonb("worker_ids").$type<string[]>().notNull(),
         config: json("config").notNull(), // flexible config: url, method, headers, body, etc.
         successStatuses: json("success_statuses").$type<number[]>(), // e.g. [200, 201]
         createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -80,7 +82,31 @@ export const monitor = pgTable(
         ),
         index("monitor_active_idx").on(table.active),
         index("monitor_group_idx").on(table.groupId),
+        // Workers look up their monitors with jsonb containment (@>) on every
+        // heartbeat.
+        index("monitor_worker_ids_gin_idx").using("gin", table.workerIds),
+        index("monitor_locations_gin_idx").using("gin", table.locations),
     ],
+);
+
+/**
+ * Latest reported status per monitor and worker location. Maintained in the
+ * same transaction as event ingestion so status reads never have to scan the
+ * time-series history.
+ */
+export const monitorLocationState = pgTable(
+    "monitor_location_state",
+    {
+        monitorId: text("monitor_id")
+            .notNull()
+            .references(() => monitor.id, { onDelete: "cascade" }),
+        location: text("location").notNull(),
+        status: text("status").notNull(),
+        timestamp: timestamp("timestamp").notNull(),
+        // When the location entered its current status; drives recovery windows.
+        statusSince: timestamp("status_since"),
+    },
+    (table) => [primaryKey({ columns: [table.monitorId, table.location] })],
 );
 
 export const monitorRelations = relations(monitor, ({ one, many }) => ({

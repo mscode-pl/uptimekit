@@ -9,7 +9,7 @@ import type {
 
 type RawDesign = Record<string, unknown>;
 
-interface RawStatusPageConfig {
+export interface RawStatusPageConfig {
     id: string;
     name: string;
     slug: string;

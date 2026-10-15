@@ -2,22 +2,15 @@ import {
     type BadgeTheme,
     PublicStatusBadge,
 } from "@/status-page/components/public-status-badge";
-import { prepareStatusPageData } from "./data-preparer";
-
-interface PublicPageRecord {
-    id: string;
-    name: string;
-    slug: string;
-    design?: unknown;
-    [key: string]: unknown;
-}
+import { getStatusPageData } from "./data-preparer";
+import type { StatusPageRecord } from "./db-queries";
 
 export async function renderStatusBadge(
-    pageConfig: PublicPageRecord,
+    pageConfig: StatusPageRecord,
     routeSlug?: string,
     theme: BadgeTheme = "light",
 ) {
-    const data = await prepareStatusPageData(pageConfig, routeSlug);
+    const data = await getStatusPageData(pageConfig, routeSlug);
 
     return (
         <main

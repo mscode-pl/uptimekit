@@ -3,7 +3,7 @@
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { sileo } from "sileo";
@@ -105,10 +105,14 @@ function useCreateIncidentFormModel() {
     const monitors = monitorsData?.items ?? [];
     const statusPages = statusPagesData?.items ?? [];
 
+    const queryClient = useQueryClient();
     const createIncident = useMutation(
         orpc.incidents.create.mutationOptions({
             onSuccess: (data) => {
                 sileo.success({ title: "Incident created successfully" });
+                void queryClient.invalidateQueries({
+                    queryKey: orpc.incidents.key(),
+                });
                 router.push(`/incidents/${data.id}`);
             },
             onError: (err) => {

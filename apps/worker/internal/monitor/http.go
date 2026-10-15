@@ -23,7 +23,7 @@ func (m *HTTPMonitor) Check(cfg Config) Result {
 	result := Result{
 		MonitorID: cfg.ID,
 		Status:    StatusDown,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: FormatTimestamp(time.Now()),
 	}
 
 	if cfg.URL == "" {
@@ -100,17 +100,7 @@ func (m *HTTPMonitor) Check(cfg Config) Result {
 	// Add trace to request
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
-	// Create client with timeout
-	client := &http.Client{
-		Timeout: timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Follow redirects but limit to 10
-			if len(via) >= 10 {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
-	}
+	client := newCheckClient(timeout)
 
 	// Execute request
 	requestStart = time.Now()
@@ -124,8 +114,8 @@ func (m *HTTPMonitor) Check(cfg Config) Result {
 	}
 	defer resp.Body.Close()
 
-	// Read body to complete transfer timing
-	_, transferErr := io.Copy(io.Discard, resp.Body)
+	// Read body to complete transfer timing, without downloading huge payloads.
+	_, transferErr := io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBodyBytes))
 	transferDone := time.Now()
 
 	// Calculate timings
@@ -166,8 +156,12 @@ func (m *HTTPMonitor) Check(cfg Config) Result {
 		result.Error = "HTTP " + strconv.Itoa(resp.StatusCode) + " " + resp.Status
 	}
 
-	// Extract certificate information for HTTPS connections
-	if tlsState != nil && len(tlsState.PeerCertificates) > 0 {
+	// Prefer the final response's TLS state so redirects report the
+	// certificate that actually served the response.
+	if resp.TLS != nil {
+		tlsState = resp.TLS
+	}
+	if cfg.ShouldReportCertificate() && tlsState != nil && len(tlsState.PeerCertificates) > 0 {
 		result.CertificateInfo = m.extractCertificateInfo(tlsState, cfg.URL)
 	}
 

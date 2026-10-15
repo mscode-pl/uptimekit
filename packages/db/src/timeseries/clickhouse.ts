@@ -19,6 +19,7 @@ import type {
     StatusCodeDistributionQuery,
     WorkerStatus,
 } from "./types";
+import { SPARKLINE_LOOKBACK_MS } from "./types";
 
 interface BootstrapQuery {
     query: string;
@@ -42,18 +43,19 @@ const BOOTSTRAP_QUERIES: BootstrapQuery[] = [
 			CREATE TABLE IF NOT EXISTS uptimekit.monitor_events (
 				id UUID,
 				monitorId String,
-				status String,
-				latency UInt32,
-				timestamp DateTime64(3),
+				status LowCardinality(String),
+				latency UInt32 CODEC(T64, ZSTD(1)),
+				timestamp DateTime64(3) CODEC(DoubleDelta, ZSTD(1)),
 				statusCode Nullable(UInt16),
-				error Nullable(String),
-				location Nullable(String),
-				dnsLookup Nullable(UInt32),
-				tcpConnect Nullable(UInt32),
-				tlsHandshake Nullable(UInt32),
-				ttfb Nullable(UInt32),
-				transfer Nullable(UInt32)
+				error Nullable(String) CODEC(ZSTD(3)),
+				location LowCardinality(Nullable(String)),
+				dnsLookup Nullable(UInt32) CODEC(ZSTD(1)),
+				tcpConnect Nullable(UInt32) CODEC(ZSTD(1)),
+				tlsHandshake Nullable(UInt32) CODEC(ZSTD(1)),
+				ttfb Nullable(UInt32) CODEC(ZSTD(1)),
+				transfer Nullable(UInt32) CODEC(ZSTD(1))
 				) ENGINE = MergeTree()
+				PARTITION BY toYYYYMM(timestamp)
 				ORDER BY (monitorId, timestamp)
 				SETTINGS non_replicated_deduplication_window = ${CLICKHOUSE_DEDUPLICATION_WINDOW}
 			`,
@@ -63,10 +65,11 @@ const BOOTSTRAP_QUERIES: BootstrapQuery[] = [
 			CREATE TABLE IF NOT EXISTS uptimekit.monitor_changes (
 				id UUID,
 				monitorId String,
-				status String,
-				timestamp DateTime64(3),
-				location Nullable(String)
+				status LowCardinality(String),
+				timestamp DateTime64(3) CODEC(DoubleDelta, ZSTD(1)),
+				location LowCardinality(Nullable(String))
 				) ENGINE = MergeTree()
+				PARTITION BY toYYYYMM(timestamp)
 				ORDER BY (monitorId, timestamp)
 				SETTINGS non_replicated_deduplication_window = ${CLICKHOUSE_DEDUPLICATION_WINDOW}
 			`,
@@ -737,6 +740,7 @@ export class ClickHouseDriver implements TimeSeriesDriver {
 						SELECT monitorId, location, latency, timestamp
 						FROM uptimekit.monitor_events
 						WHERE monitorId IN ({ids:Array(String)})
+							AND timestamp >= toDateTime64({since:UInt64} / 1000, 3)
 						ORDER BY monitorId, location, timestamp DESC
 						LIMIT {limit:UInt32} BY monitorId, location
 					)
@@ -744,7 +748,11 @@ export class ClickHouseDriver implements TimeSeriesDriver {
 				GROUP BY monitorId, rn
 				ORDER BY monitorId, timestamp ASC
 			`,
-            { ids: monitorIds, limit: limitPerMonitor },
+            {
+                ids: monitorIds,
+                limit: limitPerMonitor,
+                since: Date.now() - SPARKLINE_LOOKBACK_MS,
+            },
         );
 
         return rows.map((r) => ({
@@ -864,21 +872,20 @@ export class ClickHouseDriver implements TimeSeriesDriver {
     async deleteOlderThan(cutoff: Date) {
         await this.ensureSchema();
 
-        await this.getClient().command({
-            query: `
-				ALTER TABLE uptimekit.monitor_events
-				DELETE WHERE timestamp < toDateTime64({cutoff:UInt64} / 1000, 3)
-			`,
-            query_params: { cutoff: cutoff.getTime() },
-        });
-
-        await this.getClient().command({
-            query: `
-				ALTER TABLE uptimekit.monitor_changes
-				DELETE WHERE timestamp < toDateTime64({cutoff:UInt64} / 1000, 3)
-			`,
-            query_params: { cutoff: cutoff.getTime() },
-        });
+        // Lightweight deletes mask rows immediately and let merges reclaim the
+        // space, instead of the full-part rewrite that ALTER ... DELETE forces.
+        for (const table of [
+            "uptimekit.monitor_events",
+            "uptimekit.monitor_changes",
+        ] satisfies ClickHouseTimeSeriesTable[]) {
+            await this.getClient().command({
+                query: `
+					DELETE FROM ${table}
+					WHERE timestamp < toDateTime64({cutoff:UInt64} / 1000, 3)
+				`,
+                query_params: { cutoff: cutoff.getTime() },
+            });
+        }
     }
 
     async ping() {

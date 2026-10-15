@@ -3,6 +3,7 @@
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { sileo } from "sileo";
@@ -30,7 +31,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { queryClient } from "@/utils/orpc";
 
 const formSchema = z.object({
     name: z.string().min(2, {
@@ -60,6 +60,7 @@ export function CreateOrganizationDialog({
         },
     });
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const isLoading = form.formState.isSubmitting;
 

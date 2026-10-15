@@ -1,3 +1,9 @@
+/**
+ * Sparklines only look this far back so the query never scans a monitor's
+ * full history; 20 points still fit for checks running every 8 hours.
+ */
+export const SPARKLINE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+
 export interface MonitorEventInsert {
     id: string;
     monitorId: string;
