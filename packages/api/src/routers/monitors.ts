@@ -1902,6 +1902,7 @@ export const monitorsRouter = {
                 .select({
                     startedAt: incident.startedAt,
                     endedAt: incident.endedAt,
+                    plannedEndAt: incident.plannedEndAt,
                     severity: incident.severity,
                 })
                 .from(incidentMonitor)

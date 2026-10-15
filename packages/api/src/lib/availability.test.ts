@@ -31,6 +31,45 @@ describe("calculateAvailabilityStats", () => {
         expect(stats.incidentCount).toBe(0);
     });
 
+    it("ends maintenance at its planned end when it was never completed", () => {
+        const stats = calculateAvailabilityStats({
+            incidents: [
+                {
+                    startedAt: at(0),
+                    endedAt: null,
+                    plannedEndAt: at(1),
+                    severity: "maintenance",
+                },
+                { startedAt: at(2), endedAt: at(3), severity: "major" },
+            ],
+            periodStartMs: start,
+            nowMs: start + 10 * HOUR,
+        });
+
+        expect(stats.downtimeMs).toBe(HOUR);
+        expect(stats.incidentCount).toBe(1);
+        expect(stats.uptimePercent).toBeCloseTo((8 / 9) * 100);
+    });
+
+    it("ends maintenance when it is completed before its planned end", () => {
+        const stats = calculateAvailabilityStats({
+            incidents: [
+                {
+                    startedAt: at(0),
+                    endedAt: at(1),
+                    plannedEndAt: at(5),
+                    severity: "maintenance",
+                },
+                { startedAt: at(2), endedAt: at(3), severity: "major" },
+            ],
+            periodStartMs: start,
+            nowMs: start + 10 * HOUR,
+        });
+
+        expect(stats.downtimeMs).toBe(HOUR);
+        expect(stats.incidentCount).toBe(1);
+    });
+
     it("merges overlapping incidents instead of double counting", () => {
         const stats = calculateAvailabilityStats({
             incidents: [

@@ -9,6 +9,7 @@ import {
 export interface AvailabilityIncident {
     startedAt: Date;
     endedAt: Date | null;
+    plannedEndAt?: Date | null;
     severity: string;
 }
 
@@ -20,10 +21,27 @@ export interface AvailabilityStats {
     avgIncidentMs: number;
 }
 
+/**
+ * Maintenance ends when it is completed or when its planned window closes,
+ * whichever comes first; most maintenance is never completed explicitly.
+ * Other incidents last until they are resolved.
+ */
+function getEndMs(item: AvailabilityIncident, nowMs: number) {
+    const endCandidates =
+        item.severity === "maintenance"
+            ? [item.endedAt, item.plannedEndAt]
+            : [item.endedAt];
+    const endTimes = endCandidates
+        .filter((value): value is Date => value instanceof Date)
+        .map((value) => value.getTime());
+
+    return endTimes.length > 0 ? Math.min(...endTimes) : nowMs;
+}
+
 function toRange(item: AvailabilityIncident, nowMs: number): TimeRange {
     return {
         startMs: item.startedAt.getTime(),
-        endMs: (item.endedAt ?? new Date(nowMs)).getTime(),
+        endMs: getEndMs(item, nowMs),
     };
 }
 
