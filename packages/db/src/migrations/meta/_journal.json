@@ -253,6 +253,13 @@
             "when": 1792074899693,
             "tag": "0035_monitor_location_state",
             "breakpoints": true
+        },
+        {
+            "idx": 36,
+            "version": "7",
+            "when": 1792075406201,
+            "tag": "0036_monitor_assignments_jsonb",
+            "breakpoints": true
         }
     ]
 }

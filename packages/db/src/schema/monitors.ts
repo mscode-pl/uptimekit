@@ -4,6 +4,7 @@ import {
     index,
     integer,
     json,
+    jsonb,
     pgTable,
     primaryKey,
     text,
@@ -63,8 +64,8 @@ export const monitor = pgTable(
         publishIncidentToStatusPage: boolean("publish_incident_to_status_page")
             .default(false)
             .notNull(),
-        locations: json("locations").$type<string[]>().notNull(), // array of worker locations
-        workerIds: json("worker_ids").$type<string[]>().notNull(),
+        locations: jsonb("locations").$type<string[]>().notNull(), // array of worker locations
+        workerIds: jsonb("worker_ids").$type<string[]>().notNull(),
         config: json("config").notNull(), // flexible config: url, method, headers, body, etc.
         successStatuses: json("success_statuses").$type<number[]>(), // e.g. [200, 201]
         createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -81,6 +82,10 @@ export const monitor = pgTable(
         ),
         index("monitor_active_idx").on(table.active),
         index("monitor_group_idx").on(table.groupId),
+        // Workers look up their monitors with jsonb containment (@>) on every
+        // heartbeat.
+        index("monitor_worker_ids_gin_idx").using("gin", table.workerIds),
+        index("monitor_locations_gin_idx").using("gin", table.locations),
     ],
 );
 

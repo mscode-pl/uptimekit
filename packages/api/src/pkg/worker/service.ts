@@ -481,10 +481,10 @@ export async function getMonitorsForWorker(workerId: string) {
         where: and(
             eq(monitor.active, true),
             or(
-                sql`${monitor.workerIds}::jsonb @> ${JSON.stringify([workerId])}::jsonb`,
+                sql`${monitor.workerIds} @> ${JSON.stringify([workerId])}::jsonb`,
                 and(
-                    sql`coalesce(${monitor.workerIds}::jsonb, '[]'::jsonb) = '[]'::jsonb`,
-                    sql`${monitor.locations}::jsonb @> ${JSON.stringify([workerRecord.location])}::jsonb`,
+                    sql`${monitor.workerIds} = '[]'::jsonb`,
+                    sql`${monitor.locations} @> ${JSON.stringify([workerRecord.location])}::jsonb`,
                 ),
             ),
         ),
