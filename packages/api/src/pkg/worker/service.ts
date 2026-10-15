@@ -21,10 +21,7 @@ import {
     isAutomaticIncidentResolveEligible,
     type WorkerStatusSnapshot,
 } from "../../lib/monitor-status";
-import {
-    markEventProcessed,
-    processPendingNotifications,
-} from "../notifications";
+import { deleteAppEvent, processPendingNotifications } from "../notifications";
 import {
     getMonitorEventMetadata,
     invalidateMonitorEventMetadataCache,
@@ -411,7 +408,7 @@ async function persistProcessedMonitorEventBatch(input: {
         groups
             .map(({ timeseriesOutboxId }) => timeseriesOutboxId)
             .filter((id): id is string => id !== null)
-            .map((id) => markEventProcessed(id)),
+            .map((id) => deleteAppEvent(id)),
     );
 
     if (groups.some(({ processed }) => processed.eventsToDispatch.length > 0)) {
