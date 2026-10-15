@@ -16,9 +16,9 @@ export interface MonitorLocationStatus {
  * Return the latest status each worker location reported for the given
  * monitors.
  *
- * Reads the relational state table; monitors without state rows (no events
- * since this table was introduced) fall back to the time-series store once,
- * until their next event is ingested.
+ * Reads the relational state table. Monitors without state rows (no events
+ * since this table was introduced) are read from the time-series store once
+ * and seeded into the table.
  */
 export async function getLatestMonitorLocationStatuses(
     monitorIds: string[],
@@ -53,6 +53,11 @@ export async function getLatestMonitorLocationStatuses(
         await timeseries.getLatestStatusPerLocationForMonitors(
             monitorsWithoutState,
         );
+
+    // Seed every known location at once. Otherwise the first event after an
+    // upgrade would create a row for its own worker only, and the monitor
+    // would stop falling back while the other workers' statuses are missing.
+    await recordMonitorLocationStatuses(fallbackRows, { database });
 
     return [...rows, ...fallbackRows];
 }
