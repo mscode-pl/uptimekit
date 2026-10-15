@@ -848,6 +848,10 @@ export class TimescaleDriver implements TimeSeriesDriver {
 
         const sql = this.getClient();
 
+        // Dropping whole chunks is far cheaper than row deletes, especially for
+        // compressed chunks; the DELETE only touches the partially expired chunk.
+        await sql`SELECT drop_chunks('monitor_events', older_than => ${cutoff}::timestamptz)`;
+        await sql`SELECT drop_chunks('monitor_changes', older_than => ${cutoff}::timestamptz)`;
         await sql`DELETE FROM monitor_events WHERE timestamp < ${cutoff}`;
         await sql`DELETE FROM monitor_changes WHERE timestamp < ${cutoff}`;
     }
