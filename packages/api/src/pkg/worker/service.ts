@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { db, timeseries } from "@uptimekit/db";
+import { db } from "@uptimekit/db";
 import {
     incident,
     incidentActivity,
@@ -11,6 +11,11 @@ import { statusPageMonitor } from "@uptimekit/db/schema/status-pages";
 import { worker } from "@uptimekit/db/schema/workers";
 import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { type AppEventPayload, publishAppEvent } from "../../lib/events";
+import {
+    getLatestMonitorLocationStatuses,
+    type MonitorLocationStatus,
+    recordMonitorLocationStatuses,
+} from "../../lib/monitor-location-state";
 import {
     type AutomaticIncidentOpenEvaluation,
     type ConfiguredWorkerStateResult,
@@ -77,6 +82,7 @@ interface ProcessedMonitorEventGroup {
     incidentStatusPagesToInsert: (typeof incidentStatusPage.$inferInsert)[];
     activitiesToInsert: (typeof incidentActivity.$inferInsert)[];
     eventsToDispatch: WorkerIncidentEventDispatch[];
+    locationStatuses: MonitorLocationStatus[];
 }
 
 interface ProcessedMonitorEventBatch {
@@ -282,6 +288,10 @@ async function persistProcessedMonitorEventGroup(input: {
     tx: TransactionLike;
 }) {
     const { processed, tx } = input;
+
+    await recordMonitorLocationStatuses(processed.locationStatuses, {
+        database: tx,
+    });
 
     if (processed.incidentsToInsert.length > 0) {
         await tx.insert(incident).values(processed.incidentsToInsert);
@@ -604,6 +614,7 @@ async function processMonitorEventGroup(input: {
         incidentStatusPagesToInsert: [],
         activitiesToInsert: [],
         eventsToDispatch: [],
+        locationStatuses: [],
     };
 
     const cachedMetadata = getMonitorEventMetadata(monitorId);
@@ -729,8 +740,10 @@ async function processMonitorEventGroup(input: {
         ]),
     );
 
-    const latestWorkerStatuses =
-        await timeseries.getLatestStatusPerLocation(monitorId);
+    const latestWorkerStatuses = await getLatestMonitorLocationStatuses(
+        [monitorId],
+        { database: tx },
+    );
     const workerStatusById = new Map<string, WorkerStatusSnapshot>();
     for (const workerStatus of latestWorkerStatuses) {
         workerStatusById.set(workerStatus.location, {
@@ -753,6 +766,12 @@ async function processMonitorEventGroup(input: {
         const eventWorkerId = event.location || workerId;
 
         workerStatusById.set(eventWorkerId, {
+            status: event.status,
+            timestamp: eventTime,
+        });
+        result.locationStatuses.push({
+            monitorId,
+            location: eventWorkerId,
             status: event.status,
             timestamp: eventTime,
         });

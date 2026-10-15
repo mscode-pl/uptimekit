@@ -5,6 +5,7 @@ import {
     integer,
     json,
     pgTable,
+    primaryKey,
     text,
     timestamp,
 } from "drizzle-orm/pg-core";
@@ -81,6 +82,24 @@ export const monitor = pgTable(
         index("monitor_active_idx").on(table.active),
         index("monitor_group_idx").on(table.groupId),
     ],
+);
+
+/**
+ * Latest reported status per monitor and worker location. Maintained in the
+ * same transaction as event ingestion so status reads never have to scan the
+ * time-series history.
+ */
+export const monitorLocationState = pgTable(
+    "monitor_location_state",
+    {
+        monitorId: text("monitor_id")
+            .notNull()
+            .references(() => monitor.id, { onDelete: "cascade" }),
+        location: text("location").notNull(),
+        status: text("status").notNull(),
+        timestamp: timestamp("timestamp").notNull(),
+    },
+    (table) => [primaryKey({ columns: [table.monitorId, table.location] })],
 );
 
 export const monitorRelations = relations(monitor, ({ one, many }) => ({

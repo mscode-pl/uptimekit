@@ -1,7 +1,8 @@
-import { db, timeseries } from "@uptimekit/db";
+import { db } from "@uptimekit/db";
 import { incident, incidentMonitor } from "@uptimekit/db/schema/incidents";
 import { worker } from "@uptimekit/db/schema/workers";
 import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { getLatestMonitorLocationStatuses } from "./monitor-location-state";
 
 type TransactionLike = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type QueryableDatabase = typeof db | TransactionLike;
@@ -670,7 +671,7 @@ export async function getAggregateMonitorStatusesForMonitors(
         getEffectiveWorkersForMonitors(monitors, {
             activeOnly: options.activeOnlyWorkers ?? true,
         }),
-        timeseries.getLatestStatusPerLocationForMonitors(monitorIds),
+        getLatestMonitorLocationStatuses(monitorIds),
         options.activeMaintenanceMonitorIds ??
             getActiveMaintenanceMonitorIds(monitorIds),
     ]);
