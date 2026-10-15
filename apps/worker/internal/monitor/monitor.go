@@ -1,5 +1,7 @@
 package monitor
 
+import "time"
+
 // Monitor is the interface that all monitor types must implement.
 // Each monitor type (HTTP, TCP, ICMP, etc.) implements this interface.
 type Monitor interface {
@@ -79,14 +81,27 @@ type CertificateInfo struct {
 
 // Result represents the outcome of a monitor check.
 type Result struct {
-	MonitorID       string           `json:"monitorId"`
-	Status          string           `json:"status"` // "up" or "down"
-	Latency         int64            `json:"latency"`
-	Timings         *Timings         `json:"timings,omitempty"`
-	StatusCode      int              `json:"statusCode,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	Timestamp       string           `json:"timestamp"`
-	CertificateInfo *CertificateInfo `json:"certificateInfo,omitempty"`
+	// ID uniquely identifies the check so the dashboard can deduplicate
+	// retried deliveries exactly.
+	ID         string   `json:"id,omitempty"`
+	MonitorID  string   `json:"monitorId"`
+	Status     string   `json:"status"` // "up" or "down"
+	Latency    int64    `json:"latency"`
+	Timings    *Timings `json:"timings,omitempty"`
+	StatusCode int      `json:"statusCode,omitempty"`
+	Error      string   `json:"error,omitempty"`
+	Timestamp  string   `json:"timestamp"`
+	// CertificateInfo is delivered through its own endpoint, not with events.
+	CertificateInfo *CertificateInfo `json:"-"`
+}
+
+// TimestampFormat keeps millisecond precision so checks within the same
+// second stay distinct.
+const TimestampFormat = "2006-01-02T15:04:05.000Z07:00"
+
+// FormatTimestamp renders t in UTC using TimestampFormat.
+func FormatTimestamp(t time.Time) string {
+	return t.UTC().Format(TimestampFormat)
 }
 
 // Status constants

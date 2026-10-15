@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds the worker configuration from environment variables.
@@ -12,6 +13,7 @@ type Config struct {
 	DashboardURL   string
 	CheckInterval  int // seconds
 	MaxConcurrency int
+	LogLevel       string
 }
 
 // Load reads configuration from environment variables.
@@ -34,11 +36,17 @@ func Load() *Config {
 		dashboardURL = "http://localhost:3000"
 	}
 
+	logLevel := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL")))
+	if logLevel != "debug" {
+		logLevel = "info"
+	}
+
 	return &Config{
 		APIKey:         os.Getenv("WORKER_API_KEY"),
 		DashboardURL:   dashboardURL,
 		CheckInterval:  interval,
 		MaxConcurrency: maxConcurrency,
+		LogLevel:       logLevel,
 	}
 }
 

@@ -186,6 +186,7 @@ type runner struct {
 	registry       *monitor.Registry
 	scheduler      *monitorScheduler
 	events         *eventBatcher
+	certs          *certReporter
 	maxConcurrency int
 	mu             sync.Mutex
 	wg             sync.WaitGroup
@@ -201,6 +202,7 @@ func newRunner(
 		registry:       registry,
 		scheduler:      newMonitorScheduler(),
 		events:         newEventBatcher(client),
+		certs:          newCertReporter(),
 		maxConcurrency: maxConcurrency,
 	}
 }
@@ -216,7 +218,13 @@ func (r *runner) syncMonitors() {
 	r.scheduler.sync(monitors, time.Now())
 	r.mu.Unlock()
 
-	log.Printf("Received %d monitors.", len(monitors))
+	assigned := make(map[string]struct{}, len(monitors))
+	for _, m := range monitors {
+		assigned[m.ID] = struct{}{}
+	}
+	r.certs.retain(assigned)
+
+	debugf("Received %d monitors.", len(monitors))
 }
 
 func (r *runner) startDueChecks() {
@@ -229,7 +237,7 @@ func (r *runner) startDueChecks() {
 		return
 	}
 
-	log.Printf("Starting %d due monitor checks.", len(due))
+	debugf("Starting %d due monitor checks.", len(due))
 
 	for _, cfg := range due {
 		r.wg.Add(1)
@@ -245,7 +253,7 @@ func (r *runner) checkAndPush(cfg monitor.Config) {
 		r.mu.Unlock()
 	}()
 
-	log.Printf("[DEBUG] Monitor ID=%s Type=%s URL=%q Hostname=%q Port=%d Timeout=%d Retries=%d RetryInterval=%d",
+	debugf("Monitor ID=%s Type=%s URL=%q Hostname=%q Port=%d Timeout=%d Retries=%d RetryInterval=%d",
 		cfg.ID, cfg.Type, cfg.URL, cfg.Hostname, cfg.Port, cfg.Timeout, cfg.Retries, cfg.RetryInterval)
 
 	m := r.registry.Get(cfg.Type)
@@ -255,23 +263,36 @@ func (r *runner) checkAndPush(cfg monitor.Config) {
 	}
 
 	result := checkWithRetries(m, cfg, time.Sleep)
-	log.Printf("[DEBUG] Result: ID=%s Status=%s Latency=%dms Error=%q",
+	result.ID = newEventID()
+	debugf("Result: ID=%s Status=%s Latency=%dms Error=%q",
 		result.MonitorID, result.Status, result.Latency, result.Error)
 
 	if err := r.events.Enqueue(result); err != nil {
 		log.Printf("Could not durably queue event for monitor %s: %v", result.MonitorID, err)
 	} else {
-		log.Printf("Queued event for monitor %s.", result.MonitorID)
+		debugf("Queued event for monitor %s.", result.MonitorID)
 	}
 
-	if result.CertificateInfo != nil {
-		if err := r.client.PushCertificateInfo(result.MonitorID, result.CertificateInfo); err != nil {
-			log.Printf("Push certificate info failed for monitor %s: %v", result.MonitorID, err)
-		} else {
-			log.Printf("Pushed certificate info for monitor %s (expires in %d days)",
-				result.MonitorID, result.CertificateInfo.DaysUntilExpiry)
-		}
+	r.reportCertificate(result.MonitorID, result.CertificateInfo)
+}
+
+func (r *runner) reportCertificate(monitorID string, info *monitor.CertificateInfo) {
+	if info == nil {
+		return
 	}
+
+	now := time.Now()
+	if !r.certs.shouldReport(monitorID, info, now) {
+		return
+	}
+
+	if err := r.client.PushCertificateInfo(monitorID, info); err != nil {
+		log.Printf("Push certificate info failed for monitor %s: %v", monitorID, err)
+		return
+	}
+
+	r.certs.recordReported(monitorID, info, now)
+	debugf("Pushed certificate info for monitor %s (expires in %d days)", monitorID, info.DaysUntilExpiry)
 }
 
 func (r *runner) wait(ctx context.Context) error {
@@ -337,6 +358,8 @@ func main() {
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
+
+	debugLogging = cfg.LogLevel == "debug"
 
 	// Create API client
 	client := api.NewClient(cfg.DashboardURL, cfg.APIKey)

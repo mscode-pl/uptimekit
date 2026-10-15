@@ -23,7 +23,7 @@ func (m *HTTPMonitor) Check(cfg Config) Result {
 	result := Result{
 		MonitorID: cfg.ID,
 		Status:    StatusDown,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: FormatTimestamp(time.Now()),
 	}
 
 	if cfg.URL == "" {
