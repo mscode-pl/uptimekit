@@ -17,6 +17,8 @@ export type MonitorRuntimeStatus =
 export interface WorkerStatusSnapshot {
     status: MonitorRuntimeStatus;
     timestamp: Date;
+    /** When the worker entered `status`; defaults to `timestamp`. */
+    since?: Date;
 }
 
 export interface ConfiguredWorkerStateResult {
@@ -480,6 +482,8 @@ export function isAutomaticIncidentResolveEligible(input: {
     configuredWorkerIds: string[];
     workerStatusById: Map<string, WorkerStatusSnapshot>;
     activeIncident: { id: string } | undefined;
+    eventTime?: Date;
+    incidentRecoveryDurationSeconds?: number;
 }): boolean {
     if (!input.activeIncident) {
         return false;
@@ -502,10 +506,31 @@ export function isAutomaticIncidentResolveEligible(input: {
         workerStatusById: input.workerStatusById,
     });
 
-    return (
-        aggregateStatus.status === "up" ||
-        aggregateStatus.status === "maintenance"
+    if (aggregateStatus.status === "maintenance") {
+        return true;
+    }
+
+    if (aggregateStatus.status !== "up") {
+        return false;
+    }
+
+    const recoveryMs = (input.incidentRecoveryDurationSeconds ?? 0) * 1000;
+    if (recoveryMs <= 0 || !input.eventTime) {
+        return true;
+    }
+
+    // Every worker must have stayed up for the whole recovery window, so the
+    // window starts when the last of them recovered.
+    const eventTimeMs = input.eventTime.getTime();
+    const allWorkersUpSinceMs = Math.max(
+        ...input.configuredWorkerIds.map((workerId) => {
+            const snapshot = input.workerStatusById.get(workerId);
+            const upSince = snapshot?.since ?? snapshot?.timestamp;
+            return upSince ? upSince.getTime() : eventTimeMs;
+        }),
     );
+
+    return eventTimeMs - allWorkersUpSinceMs >= recoveryMs;
 }
 
 async function getActiveMaintenanceMonitorIds(monitorIds: string[]) {

@@ -13,6 +13,7 @@ function metadata(name: string): MonitorEventMetadata {
             name,
             organizationId: "organization-id",
             incidentPendingDuration: 0,
+            incidentRecoveryDuration: 0,
             publishIncidentToStatusPage: false,
         },
     };

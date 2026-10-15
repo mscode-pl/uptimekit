@@ -1,0 +1,1 @@
+ALTER TABLE "monitor_location_state" ADD COLUMN "status_since" timestamp;

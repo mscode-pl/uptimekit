@@ -797,6 +797,7 @@ async function processMonitorEventGroup(input: {
         workerStatusById.set(workerStatus.location, {
             status: workerStatus.status as MonitorEvent["status"],
             timestamp: workerStatus.timestamp,
+            since: workerStatus.statusSince ?? workerStatus.timestamp,
         });
     }
 
@@ -813,15 +814,23 @@ async function processMonitorEventGroup(input: {
         const eventTime = new Date(event.timestamp);
         const eventWorkerId = event.location || workerId;
 
+        const previousWorkerStatus = workerStatusById.get(eventWorkerId);
+        const statusSince =
+            previousWorkerStatus?.status === event.status
+                ? (previousWorkerStatus.since ?? previousWorkerStatus.timestamp)
+                : eventTime;
+
         workerStatusById.set(eventWorkerId, {
             status: event.status,
             timestamp: eventTime,
+            since: statusSince,
         });
         result.locationStatuses.push({
             monitorId,
             location: eventWorkerId,
             status: event.status,
             timestamp: eventTime,
+            statusSince,
         });
 
         const aggregateStatus = getAggregateMonitorStatus({
@@ -852,6 +861,9 @@ async function processMonitorEventGroup(input: {
                 configuredWorkerIds,
                 workerStatusById,
                 activeIncident,
+                eventTime,
+                incidentRecoveryDurationSeconds:
+                    monitorConfig.incidentRecoveryDuration,
             })
         ) {
             const resolvedIncident = activeIncident;
@@ -1068,7 +1080,5 @@ async function processMonitorEventGroup(input: {
         }
     }
 
-    // `incidentRecoveryDuration` exists on the monitor schema but remains intentionally
-    // unused here so this fix only changes multi-worker incident gating behavior.
     return result;
 }

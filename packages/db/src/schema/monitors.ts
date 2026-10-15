@@ -103,6 +103,8 @@ export const monitorLocationState = pgTable(
         location: text("location").notNull(),
         status: text("status").notNull(),
         timestamp: timestamp("timestamp").notNull(),
+        // When the location entered its current status; drives recovery windows.
+        statusSince: timestamp("status_since"),
     },
     (table) => [primaryKey({ columns: [table.monitorId, table.location] })],
 );

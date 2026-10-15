@@ -10,6 +10,7 @@ export interface MonitorLocationStatus {
     location: string;
     status: string;
     timestamp: Date;
+    statusSince?: Date | null;
 }
 
 /**
@@ -36,6 +37,7 @@ export async function getLatestMonitorLocationStatuses(
             location: monitorLocationState.location,
             status: monitorLocationState.status,
             timestamp: monitorLocationState.timestamp,
+            statusSince: monitorLocationState.statusSince,
         })
         .from(monitorLocationState)
         .where(inArray(monitorLocationState.monitorId, uniqueMonitorIds));
@@ -95,6 +97,7 @@ export async function recordMonitorLocationStatuses(
             set: {
                 status: sql`excluded.status`,
                 timestamp: sql`excluded.timestamp`,
+                statusSince: sql`excluded.status_since`,
             },
             setWhere: sql`excluded.timestamp >= ${monitorLocationState.timestamp}`,
         });
