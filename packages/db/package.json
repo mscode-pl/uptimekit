@@ -16,10 +16,12 @@
         "db:studio": "drizzle-kit studio",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "tsx src/migrate.ts",
-        "test": "vitest run"
+        "test": "vitest run",
+        "build:migrate": "esbuild src/migrate.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/migrate.mjs --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" && rm -rf dist/migrations && cp -r src/migrations dist/migrations"
     },
     "devDependencies": {
         "drizzle-kit": "^0.31.11",
+        "esbuild": "^0.28.0",
         "testcontainers": "^12.2.0",
         "tsx": "^4.23.15",
         "typescript": "^7.0.2",
