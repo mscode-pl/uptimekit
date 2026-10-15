@@ -7,14 +7,25 @@ import type { AppRouterClient } from "@uptimekit/api/routers/index";
 import { sileo } from "sileo";
 
 export const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            // Without a stale time every mount and window focus refetched every
+            // query. Mutations still invalidate explicitly, and live views set
+            // their own refetchInterval.
+            staleTime: 15_000,
+        },
+    },
     queryCache: new QueryCache({
-        onError: (error) => {
+        onError: (error, query) => {
             sileo.action({
                 title: `Error: ${error.message}`,
                 button: {
                     title: "Retry",
                     onClick: () => {
-                        queryClient.invalidateQueries();
+                        queryClient.refetchQueries({
+                            queryKey: query.queryKey,
+                            exact: true,
+                        });
                     },
                 },
             });
