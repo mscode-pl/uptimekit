@@ -28,6 +28,13 @@ type Config struct {
 	Keyword             string      `json:"keyword,omitempty"`       // For keyword monitor
 	JSONPath            string      `json:"jsonPath,omitempty"`      // For JSON monitor
 	ExpectedValue       string      `json:"expectedValue,omitempty"` // For DNS expected answer and JSON value validation
+	CheckSSL            *bool       `json:"checkSsl,omitempty"`      // Report certificate expiry; defaults to true
+}
+
+// ShouldReportCertificate reports whether certificate details should be sent
+// for this monitor. Older dashboards omit the field, which means enabled.
+func (c *Config) ShouldReportCertificate() bool {
+	return c.CheckSSL == nil || *c.CheckSSL
 }
 
 // GetHeaders returns headers as map[string]string, handling various API formats.
