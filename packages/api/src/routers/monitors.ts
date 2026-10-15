@@ -28,6 +28,7 @@ import {
 } from "drizzle-orm";
 import { z } from "zod";
 import { protectedProcedure, writeProcedure } from "../index";
+import { calculateAvailabilityStats } from "../lib/availability";
 import { insertMonitor } from "../lib/insert-monitor";
 import {
     getAggregateMonitorStatusesForMonitors,
@@ -1860,6 +1861,7 @@ export const monitorsRouter = {
                 .select({
                     startedAt: incident.startedAt,
                     endedAt: incident.endedAt,
+                    severity: incident.severity,
                 })
                 .from(incidentMonitor)
                 .innerJoin(
@@ -1882,48 +1884,14 @@ export const monitorsRouter = {
                 )
                 .orderBy(incident.startedAt);
 
-            const calculateStats = (startDate: Date | null) => {
-                const periodStart = startDate
-                    ? Math.max(startDate.getTime(), monitorCreatedAt)
-                    : monitorCreatedAt;
-                const totalTime = Math.max(1, nowMs - periodStart);
-
-                const overlappingDurations = incidents.map((item) => {
-                    const overlapStart = Math.max(
-                        item.startedAt.getTime(),
-                        periodStart,
-                    );
-                    const overlapEnd = Math.min(
-                        (item.endedAt ?? new Date(nowMs)).getTime(),
-                        nowMs,
-                    );
-                    return Math.max(0, overlapEnd - overlapStart);
+            const calculateStats = (startDate: Date | null) =>
+                calculateAvailabilityStats({
+                    incidents,
+                    periodStartMs: startDate
+                        ? Math.max(startDate.getTime(), monitorCreatedAt)
+                        : monitorCreatedAt,
+                    nowMs,
                 });
-
-                const downtimeMs = overlappingDurations.reduce(
-                    (sum, duration) => sum + duration,
-                    0,
-                );
-                const incidentCount = overlappingDurations.filter(
-                    (duration) => duration > 0,
-                ).length;
-                const maxIncidentMs = Math.max(0, ...overlappingDurations);
-                const incidentSumMs = overlappingDurations.reduce(
-                    (sum, duration) => sum + duration,
-                    0,
-                );
-                const uptimeMs = Math.max(0, totalTime - downtimeMs);
-                const uptimePercent = (uptimeMs / totalTime) * 100;
-
-                return {
-                    uptimePercent,
-                    downtimeMs,
-                    incidentCount,
-                    maxIncidentMs,
-                    avgIncidentMs:
-                        incidentCount > 0 ? incidentSumMs / incidentCount : 0,
-                };
-            };
 
             const now = new Date();
             const day = new Date();

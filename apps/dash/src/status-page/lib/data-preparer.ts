@@ -1,4 +1,10 @@
 import { getAggregateMonitorStatusesForMonitors } from "@uptimekit/api/lib/monitor-status";
+import {
+    mergeRanges,
+    subtractRanges,
+    sumRanges,
+    type TimeRange,
+} from "@uptimekit/api/lib/time-ranges";
 import type {
     Monitor,
     MonitorGroup,
@@ -24,11 +30,6 @@ import {
 import { calculateAggregateStatus } from "./status-utils";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-interface TimeRange {
-    startMs: number;
-    endMs: number;
-}
 
 function buildOperationalHistory(days = 90, endDate?: string): UptimeDay[] {
     const result: UptimeDay[] = [];
@@ -94,74 +95,6 @@ function getOverlapRange(
         startMs: overlapStartMs,
         endMs: overlapEndMs,
     };
-}
-
-function mergeRanges(ranges: TimeRange[]): TimeRange[] {
-    if (ranges.length <= 1) {
-        return ranges.map((range) => ({ ...range }));
-    }
-
-    const sortedRanges = [...ranges].sort((a, b) => a.startMs - b.startMs);
-    const mergedRanges: TimeRange[] = [{ ...sortedRanges[0] }];
-
-    for (const range of sortedRanges.slice(1)) {
-        const lastRange = mergedRanges[mergedRanges.length - 1];
-
-        if (range.startMs <= lastRange.endMs) {
-            lastRange.endMs = Math.max(lastRange.endMs, range.endMs);
-            continue;
-        }
-
-        mergedRanges.push({ ...range });
-    }
-
-    return mergedRanges;
-}
-
-function sumRanges(ranges: TimeRange[]): number {
-    return ranges.reduce(
-        (total, range) => total + range.endMs - range.startMs,
-        0,
-    );
-}
-
-function subtractRanges(
-    ranges: TimeRange[],
-    exclusions: TimeRange[],
-): TimeRange[] {
-    let remainingRanges = mergeRanges(ranges);
-    const mergedExclusions = mergeRanges(exclusions);
-
-    for (const exclusion of mergedExclusions) {
-        remainingRanges = remainingRanges.flatMap((range) => {
-            if (
-                exclusion.endMs <= range.startMs ||
-                exclusion.startMs >= range.endMs
-            ) {
-                return [range];
-            }
-
-            const nextRanges: TimeRange[] = [];
-
-            if (exclusion.startMs > range.startMs) {
-                nextRanges.push({
-                    startMs: range.startMs,
-                    endMs: Math.min(exclusion.startMs, range.endMs),
-                });
-            }
-
-            if (exclusion.endMs < range.endMs) {
-                nextRanges.push({
-                    startMs: Math.max(exclusion.endMs, range.startMs),
-                    endMs: range.endMs,
-                });
-            }
-
-            return nextRanges;
-        });
-    }
-
-    return remainingRanges;
 }
 
 function getIncidentStatus(severity: string): StatusType {
