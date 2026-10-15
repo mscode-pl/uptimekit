@@ -43,18 +43,19 @@ const BOOTSTRAP_QUERIES: BootstrapQuery[] = [
 			CREATE TABLE IF NOT EXISTS uptimekit.monitor_events (
 				id UUID,
 				monitorId String,
-				status String,
-				latency UInt32,
-				timestamp DateTime64(3),
+				status LowCardinality(String),
+				latency UInt32 CODEC(T64, ZSTD(1)),
+				timestamp DateTime64(3) CODEC(DoubleDelta, ZSTD(1)),
 				statusCode Nullable(UInt16),
-				error Nullable(String),
-				location Nullable(String),
-				dnsLookup Nullable(UInt32),
-				tcpConnect Nullable(UInt32),
-				tlsHandshake Nullable(UInt32),
-				ttfb Nullable(UInt32),
-				transfer Nullable(UInt32)
+				error Nullable(String) CODEC(ZSTD(3)),
+				location LowCardinality(Nullable(String)),
+				dnsLookup Nullable(UInt32) CODEC(ZSTD(1)),
+				tcpConnect Nullable(UInt32) CODEC(ZSTD(1)),
+				tlsHandshake Nullable(UInt32) CODEC(ZSTD(1)),
+				ttfb Nullable(UInt32) CODEC(ZSTD(1)),
+				transfer Nullable(UInt32) CODEC(ZSTD(1))
 				) ENGINE = MergeTree()
+				PARTITION BY toYYYYMM(timestamp)
 				ORDER BY (monitorId, timestamp)
 				SETTINGS non_replicated_deduplication_window = ${CLICKHOUSE_DEDUPLICATION_WINDOW}
 			`,
@@ -64,10 +65,11 @@ const BOOTSTRAP_QUERIES: BootstrapQuery[] = [
 			CREATE TABLE IF NOT EXISTS uptimekit.monitor_changes (
 				id UUID,
 				monitorId String,
-				status String,
-				timestamp DateTime64(3),
-				location Nullable(String)
+				status LowCardinality(String),
+				timestamp DateTime64(3) CODEC(DoubleDelta, ZSTD(1)),
+				location LowCardinality(Nullable(String))
 				) ENGINE = MergeTree()
+				PARTITION BY toYYYYMM(timestamp)
 				ORDER BY (monitorId, timestamp)
 				SETTINGS non_replicated_deduplication_window = ${CLICKHOUSE_DEDUPLICATION_WINDOW}
 			`,

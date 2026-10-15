@@ -8,7 +8,11 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { resolveTimeSeriesBackend, TimescaleDriver } from "./timeseries";
+import {
+    ClickHouseDriver,
+    resolveTimeSeriesBackend,
+    TimescaleDriver,
+} from "./timeseries";
 
 loadEnv();
 
@@ -228,43 +232,16 @@ const runClickHouseMigrations = async () => {
     try {
         await waitForClickHouse(clickhouse);
 
-        await clickhouse.command({
-            query: "CREATE DATABASE IF NOT EXISTS uptimekit",
+        const driver = new ClickHouseDriver({
+            url: clickhouseUrl,
+            username: process.env.CLICKHOUSE_USER || "default",
+            password: process.env.CLICKHOUSE_PASSWORD || "",
         });
-
-        await clickhouse.command({
-            query: `
-				CREATE TABLE IF NOT EXISTS uptimekit.monitor_events (
-					id UUID,
-					monitorId String,
-					status String,
-					latency UInt32,
-					timestamp DateTime64(3),
-					statusCode Nullable(UInt16),
-					error Nullable(String),
-					location Nullable(String),
-					dnsLookup Nullable(UInt32),
-					tcpConnect Nullable(UInt32),
-					tlsHandshake Nullable(UInt32),
-					ttfb Nullable(UInt32),
-					transfer Nullable(UInt32)
-				) ENGINE = MergeTree()
-				ORDER BY (monitorId, timestamp)
-			`,
-        });
-
-        await clickhouse.command({
-            query: `
-				CREATE TABLE IF NOT EXISTS uptimekit.monitor_changes (
-					id UUID,
-					monitorId String,
-					status String,
-					timestamp DateTime64(3),
-					location Nullable(String)
-				) ENGINE = MergeTree()
-				ORDER BY (monitorId, timestamp)
-			`,
-        });
+        try {
+            await driver.ensureSchema();
+        } finally {
+            await driver.close();
+        }
 
         const end = Date.now();
         console.log(`✅ ClickHouse migrations completed in ${end - start}ms`);
