@@ -13,9 +13,27 @@ import {
 } from "./db-queries";
 import type { IncidentHistoryPeriod } from "./incident-history";
 import { buildPath } from "./route-utils";
-import { prepareStatusPageConfig } from "./status-page-config";
+import {
+    prepareStatusPageConfig,
+    type RawStatusPageConfig,
+} from "./status-page-config";
 
-function mapIncident(report: any, routeSlug?: string) {
+type ArrayItem<T> = T extends readonly (infer Item)[] ? Item : never;
+type QueryItem<T extends (...args: never[]) => Promise<unknown>> = ArrayItem<
+    Awaited<ReturnType<T>>
+>;
+
+type StatusPageReport =
+    | QueryItem<typeof getStatusPageReports>
+    | QueryItem<typeof getActiveStatusPageReports>
+    | QueryItem<typeof getStatusPageReportsForPeriod>;
+type StatusPageMaintenance =
+    | QueryItem<typeof getActiveMaintenances>
+    | QueryItem<typeof getScheduledMaintenances>
+    | QueryItem<typeof getMaintenanceHistory>
+    | QueryItem<typeof getMaintenanceHistoryForPeriod>;
+
+function mapIncident(report: StatusPageReport, routeSlug?: string) {
     return {
         id: report.id,
         title: report.title,
@@ -23,10 +41,10 @@ function mapIncident(report: any, routeSlug?: string) {
         severity: report.severity,
         startedAt: report.startedAt,
         endedAt: report.endedAt,
-        monitors: report.affectedMonitors.map((am: any) => ({
+        monitors: report.affectedMonitors.map((am) => ({
             monitor: am.monitor,
         })),
-        activities: report.updates.map((u: any) => ({
+        activities: report.updates.map((u) => ({
             id: u.id,
             message: u.message,
             createdAt: u.createdAt,
@@ -36,7 +54,10 @@ function mapIncident(report: any, routeSlug?: string) {
     };
 }
 
-function mapMaintenanceIncident(maintenance: any, routeSlug?: string) {
+function mapMaintenanceIncident(
+    maintenance: StatusPageMaintenance,
+    routeSlug?: string,
+) {
     return {
         id: maintenance.id,
         title: maintenance.title,
@@ -45,7 +66,7 @@ function mapMaintenanceIncident(maintenance: any, routeSlug?: string) {
         startedAt: maintenance.startAt,
         endedAt: maintenance.endAt,
         monitors: maintenance.monitors,
-        activities: maintenance.updates.map((u: any) => ({
+        activities: maintenance.updates.map((u) => ({
             id: u.id,
             message: u.message,
             createdAt: u.createdAt,
@@ -56,7 +77,7 @@ function mapMaintenanceIncident(maintenance: any, routeSlug?: string) {
 }
 
 export async function prepareIncidentDetailData(
-    pageConfig: any,
+    pageConfig: RawStatusPageConfig,
     incidentId: string,
     routeSlug?: string,
 ): Promise<IncidentDetailData> {
@@ -75,20 +96,26 @@ export async function prepareIncidentDetailData(
     ]);
 
     const reportItem =
-        activeReports.find((r: any) => r.id === incidentId) ||
-        reports.find((r: any) => r.id === incidentId);
+        activeReports.find((r) => r.id === incidentId) ||
+        reports.find((r) => r.id === incidentId);
     const maintenanceItem =
-        activeMaintenances.find((m: any) => m.id === incidentId) ||
-        scheduledMaintenances.find((m: any) => m.id === incidentId) ||
-        history.find((m: any) => m.id === incidentId);
+        activeMaintenances.find((m) => m.id === incidentId) ||
+        scheduledMaintenances.find((m) => m.id === incidentId) ||
+        history.find((m) => m.id === incidentId);
 
-    if (!reportItem && !maintenanceItem) {
+    const incident = reportItem
+        ? mapIncident(reportItem, routeSlug)
+        : maintenanceItem
+          ? mapMaintenanceIncident(maintenanceItem, routeSlug)
+          : null;
+
+    if (!incident) {
         throw new Error("Incident not found");
     }
 
     const activeIssues = [
-        ...activeReports.map((report: any) => mapIncident(report, routeSlug)),
-        ...activeMaintenances.map((maintenance: any) =>
+        ...activeReports.map((report) => mapIncident(report, routeSlug)),
+        ...activeMaintenances.map((maintenance) =>
             mapMaintenanceIncident(maintenance, routeSlug),
         ),
     ].sort(
@@ -98,15 +125,13 @@ export async function prepareIncidentDetailData(
 
     return {
         config: prepareStatusPageConfig(pageConfig, routeSlug),
-        incident: reportItem
-            ? mapIncident(reportItem, routeSlug)
-            : mapMaintenanceIncident(maintenanceItem, routeSlug),
+        incident,
         activeIssues,
     };
 }
 
 export async function prepareUpdatesPageData(
-    pageConfig: any,
+    pageConfig: RawStatusPageConfig,
     selectedPeriod: IncidentHistoryPeriod,
     routeSlug?: string,
 ): Promise<UpdatesPageData> {
@@ -126,8 +151,8 @@ export async function prepareUpdatesPageData(
         ]);
 
     const allUpdates = [
-        ...reports.map((report: any) => mapIncident(report, routeSlug)),
-        ...maintenances.map((maintenance: any) =>
+        ...reports.map((report) => mapIncident(report, routeSlug)),
+        ...maintenances.map((maintenance) =>
             mapMaintenanceIncident(maintenance, routeSlug),
         ),
     ].sort(
@@ -153,8 +178,8 @@ export async function prepareUpdatesPageData(
     );
 
     const activeIssues = [
-        ...activeReports.map((report: any) => mapIncident(report, routeSlug)),
-        ...activeMaintenances.map((maintenance: any) =>
+        ...activeReports.map((report) => mapIncident(report, routeSlug)),
+        ...activeMaintenances.map((maintenance) =>
             mapMaintenanceIncident(maintenance, routeSlug),
         ),
     ].sort(

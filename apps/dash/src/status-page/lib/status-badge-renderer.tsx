@@ -3,17 +3,10 @@ import {
     PublicStatusBadge,
 } from "@/status-page/components/public-status-badge";
 import { getStatusPageData } from "./data-preparer";
-
-interface PublicPageRecord {
-    id: string;
-    name: string;
-    slug: string;
-    design?: unknown;
-    [key: string]: unknown;
-}
+import type { StatusPageRecord } from "./db-queries";
 
 export async function renderStatusBadge(
-    pageConfig: PublicPageRecord,
+    pageConfig: StatusPageRecord,
     routeSlug?: string,
     theme: BadgeTheme = "light",
 ) {

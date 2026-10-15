@@ -1,22 +1,15 @@
 import type { Incident } from "@/status-page/themes/types";
 import { canAccessStatusPage } from "./access-check";
+import type { StatusPageRecord } from "./db-queries";
 import { getFeedLinks } from "./feed-links";
 import { getHostFromHeaders, getProtocolFromHeaders } from "./route-utils";
 import { prepareUpdatesPageData } from "./subpage-data-preparer";
 
 type FeedFormat = "rss" | "atom";
 
-interface StatusPageConfig {
-    id: string;
-    name: string;
-    description?: string | null;
-    public: boolean;
-    password: string | null;
-}
-
 interface FeedOptions {
     request: Request;
-    pageConfig: StatusPageConfig;
+    pageConfig: StatusPageRecord;
     routeSlug?: string;
     format: FeedFormat;
 }

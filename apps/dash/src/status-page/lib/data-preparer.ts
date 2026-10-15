@@ -20,6 +20,7 @@ import {
     getScheduledMaintenances,
     getStatusPageEvents,
     getStatusPageReports,
+    type StatusPageRecord,
 } from "./db-queries";
 import { getExternalMonitorStatus, isExternalMonitor } from "./external-status";
 import { buildPath } from "./route-utils";
@@ -42,7 +43,7 @@ const statusPageDataCache = createTtlCache<StatusPageData>({
 });
 
 export function getStatusPageData(
-    pageConfig: any,
+    pageConfig: StatusPageRecord,
     routeSlug?: string,
 ): Promise<StatusPageData> {
     return statusPageDataCache.get(
@@ -131,7 +132,7 @@ function getIncidentStatus(severity: string): StatusType {
     }
 }
 
-function getWorstIncidentStatus(reports: any[]): StatusType {
+function getWorstIncidentStatus(reports: { severity: string }[]): StatusType {
     const rank: Record<StatusType, number> = {
         operational: 0,
         degraded: 1,
@@ -153,7 +154,7 @@ function getWorstIncidentStatus(reports: any[]): StatusType {
 }
 
 export async function prepareStatusPageData(
-    pageConfig: any,
+    pageConfig: StatusPageRecord,
     routeSlug?: string,
 ): Promise<StatusPageData> {
     const design = normalizeStatusPageDesign(pageConfig.design);
@@ -194,17 +195,17 @@ export async function prepareStatusPageData(
     ]);
 
     const combinedActive = [
-        ...activeReports.map((r: any) => ({
+        ...activeReports.map((r) => ({
             id: r.id,
             title: r.title,
             status: r.status,
             severity: r.severity,
             startedAt: r.startedAt,
             endedAt: r.endedAt,
-            monitors: r.affectedMonitors.map((am: any) => ({
+            monitors: r.affectedMonitors.map((am) => ({
                 monitor: am.monitor,
             })),
-            activities: r.updates.map((u: any) => ({
+            activities: r.updates.map((u) => ({
                 id: u.id,
                 message: u.message,
                 createdAt: u.createdAt,
@@ -212,7 +213,7 @@ export async function prepareStatusPageData(
             })),
             detailsLink: buildPath(`/incidents/${r.id}`, routeSlug),
         })),
-        ...activeMaintenances.map((m: any) => ({
+        ...activeMaintenances.map((m) => ({
             id: m.id,
             title: m.title,
             status: m.status,
@@ -220,7 +221,7 @@ export async function prepareStatusPageData(
             startedAt: m.startAt,
             endedAt: m.endAt,
             monitors: m.monitors,
-            activities: m.updates.map((u: any) => ({
+            activities: m.updates.map((u) => ({
                 id: u.id,
                 message: u.message,
                 createdAt: u.createdAt,
@@ -234,17 +235,17 @@ export async function prepareStatusPageData(
     );
 
     const pastIncidents = [
-        ...reports.map((r: any) => ({
+        ...reports.map((r) => ({
             id: r.id,
             title: r.title,
             status: r.status,
             severity: r.severity,
             startedAt: r.startedAt,
             endedAt: r.endedAt,
-            monitors: r.affectedMonitors.map((am: any) => ({
+            monitors: r.affectedMonitors.map((am) => ({
                 monitor: am.monitor,
             })),
-            activities: r.updates.map((u: any) => ({
+            activities: r.updates.map((u) => ({
                 id: u.id,
                 message: u.message,
                 createdAt: u.createdAt,
@@ -252,15 +253,15 @@ export async function prepareStatusPageData(
             })),
             detailsLink: buildPath(`/incidents/${r.id}`, routeSlug),
         })),
-        ...maintenances.map((m: any) => ({
+        ...maintenances.map((m) => ({
             id: m.id,
             title: m.title,
             status: m.status,
             severity: "maintenance",
             startedAt: m.startAt,
             endedAt: m.endAt,
-            monitors: m.monitors.map((mm: any) => ({ monitor: mm.monitor })),
-            activities: m.updates.map((u: any) => ({
+            monitors: m.monitors.map((mm) => ({ monitor: mm.monitor })),
+            activities: m.updates.map((u) => ({
                 id: u.id,
                 message: u.message,
                 createdAt: u.createdAt,
@@ -274,20 +275,18 @@ export async function prepareStatusPageData(
     );
 
     const monitorsData = await Promise.all(
-        pageConfig.monitors.map(async (pm: any) => {
+        pageConfig.monitors.map(async (pm) => {
             let currentStatus: StatusType = "operational";
 
-            const isUnderMaintenance = activeMaintenances.some((m: any) =>
-                m.monitors.some((mm: any) => mm.monitorId === pm.monitorId),
+            const isUnderMaintenance = activeMaintenances.some((m) =>
+                m.monitors.some((mm) => mm.monitorId === pm.monitorId),
             );
             if (isUnderMaintenance) {
-                currentStatus = "maintenance" as any;
+                currentStatus = "maintenance";
             }
 
-            const activeReport = activeReports.find((r: any) =>
-                r.affectedMonitors.some(
-                    (am: any) => am.monitorId === pm.monitorId,
-                ),
+            const activeReport = activeReports.find((r) =>
+                r.affectedMonitors.some((am) => am.monitorId === pm.monitorId),
             );
 
             if (activeReport) {
@@ -322,7 +321,7 @@ export async function prepareStatusPageData(
                         if (aggregateStatus.status === "degraded")
                             currentStatus = "degraded";
                         if (aggregateStatus.status === "maintenance")
-                            currentStatus = "maintenance" as any;
+                            currentStatus = "maintenance";
                     }
                 }
             }
@@ -335,35 +334,33 @@ export async function prepareStatusPageData(
                 const dayEnd = new Date(day.date);
                 dayEnd.setUTCHours(23, 59, 59, 999);
 
-                const maintenanceItems = events.maintenances.flatMap(
-                    (m: any) => {
-                        const affectsMonitor = m.monitors.some(
-                            (mm: any) => mm.monitorId === pm.monitorId,
-                        );
-                        if (!affectsMonitor) return [];
+                const maintenanceItems = events.maintenances.flatMap((m) => {
+                    const affectsMonitor = m.monitors.some(
+                        (mm) => mm.monitorId === pm.monitorId,
+                    );
+                    if (!affectsMonitor) return [];
 
-                        const range = getOverlapRange(
-                            m.startAt,
-                            m.endAt,
-                            dayStart,
-                            dayEnd,
-                        );
+                    const range = getOverlapRange(
+                        m.startAt,
+                        m.endAt,
+                        dayStart,
+                        dayEnd,
+                    );
 
-                        return range ? [{ range, title: m.title }] : [];
-                    },
-                );
+                    return range ? [{ range, title: m.title }] : [];
+                });
                 const maintenanceRanges = maintenanceItems.map(
-                    (item: any) => item.range,
+                    (item) => item.range,
                 );
                 const mergedMaintenanceRanges = mergeRanges(maintenanceRanges);
                 const maintenanceMs = sumRanges(mergedMaintenanceRanges);
                 const monitoredMs = Math.max(0, DAY_MS - maintenanceMs);
                 const reportRanges: TimeRange[] = [];
-                const reportsOutsideMaintenance: any[] = [];
+                const reportsOutsideMaintenance: typeof events.reports = [];
 
                 for (const r of events.reports) {
                     const affectsMonitor = r.affectedMonitors.some(
-                        (am: any) => am.monitorId === pm.monitorId,
+                        (am) => am.monitorId === pm.monitorId,
                     );
                     if (!affectsMonitor) continue;
 
@@ -401,7 +398,7 @@ export async function prepareStatusPageData(
                 if (totalIncidentMs > 0) {
                     const annotation = Array.from(
                         new Set(
-                            reportsOutsideMaintenance.flatMap((report: any) =>
+                            reportsOutsideMaintenance.flatMap((report) =>
                                 report.title ? [report.title] : [],
                             ),
                         ),
@@ -424,7 +421,7 @@ export async function prepareStatusPageData(
                 if (maintenanceMs > 0) {
                     const annotation = Array.from(
                         new Set(
-                            maintenanceItems.flatMap((item: any) =>
+                            maintenanceItems.flatMap((item) =>
                                 item.title ? [item.title] : [],
                             ),
                         ),
@@ -432,7 +429,7 @@ export async function prepareStatusPageData(
 
                     return {
                         ...day,
-                        status: "maintenance" as any,
+                        status: "maintenance" as const,
                         uptime: 100,
                         annotation,
                         maintenanceMs,
@@ -507,9 +504,7 @@ export async function prepareStatusPageData(
 
     const worstStatus = calculateAggregateStatus([
         ...monitorsData.map((monitor) => monitor.currentStatus),
-        ...activeReports.map((report: any) =>
-            getIncidentStatus(report.severity),
-        ),
+        ...activeReports.map((report) => getIncidentStatus(report.severity)),
         ...activeMaintenances.map(() => "maintenance" as const),
     ]);
 
@@ -539,7 +534,7 @@ export async function prepareStatusPageData(
         overallStatus: worstStatus,
         monitorGroups: sortedGroups,
         activeIssues: combinedActive,
-        scheduledMaintenances: scheduledMaintenances.map((m: any) => ({
+        scheduledMaintenances: scheduledMaintenances.map((m) => ({
             ...m,
             detailsLink: buildPath(`/incidents/${m.id}`, routeSlug),
         })),

@@ -1,4 +1,5 @@
 import { getStatusPageData } from "@/status-page/lib/data-preparer";
+import type { StatusPageRecord } from "@/status-page/lib/db-queries";
 import type { IncidentHistoryPeriod } from "@/status-page/lib/incident-history";
 import { normalizeStatusPageDesign } from "@/status-page/lib/status-page-config";
 import {
@@ -21,7 +22,7 @@ interface PublicPageRecord {
 }
 
 export async function renderStatusPage(
-    pageConfig: PublicPageRecord,
+    pageConfig: StatusPageRecord,
     routeSlug?: string,
 ) {
     const design = normalizeStatusPageDesign(pageConfig.design);
