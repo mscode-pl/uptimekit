@@ -28,8 +28,28 @@ import {
     prepareStatusPageConfig,
 } from "./status-page-config";
 import { calculateAggregateStatus } from "./status-utils";
+import { createTtlCache } from "./ttl-cache";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Public status pages see their heaviest traffic during outages, exactly when
+// the database is under the most pressure. A short TTL bounds staleness while
+// collapsing a burst of visits into one computation per page.
+const STATUS_PAGE_DATA_TTL_MS = 15_000;
+const statusPageDataCache = createTtlCache<StatusPageData>({
+    ttlMs: STATUS_PAGE_DATA_TTL_MS,
+    maxEntries: 500,
+});
+
+export function getStatusPageData(
+    pageConfig: any,
+    routeSlug?: string,
+): Promise<StatusPageData> {
+    return statusPageDataCache.get(
+        `${pageConfig.id}\u001f${routeSlug ?? ""}`,
+        () => prepareStatusPageData(pageConfig, routeSlug),
+    );
+}
 
 function buildOperationalHistory(days = 90, endDate?: string): UptimeDay[] {
     const result: UptimeDay[] = [];

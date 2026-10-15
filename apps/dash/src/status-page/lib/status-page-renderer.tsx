@@ -1,4 +1,4 @@
-import { prepareStatusPageData } from "@/status-page/lib/data-preparer";
+import { getStatusPageData } from "@/status-page/lib/data-preparer";
 import type { IncidentHistoryPeriod } from "@/status-page/lib/incident-history";
 import { normalizeStatusPageDesign } from "@/status-page/lib/status-page-config";
 import {
@@ -27,7 +27,7 @@ export async function renderStatusPage(
     const design = normalizeStatusPageDesign(pageConfig.design);
     const [ThemePage, data] = await Promise.all([
         loadThemeComponent(design.themeId),
-        prepareStatusPageData(pageConfig, routeSlug),
+        getStatusPageData(pageConfig, routeSlug),
     ]);
 
     return (
