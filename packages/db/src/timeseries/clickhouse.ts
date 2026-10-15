@@ -864,21 +864,20 @@ export class ClickHouseDriver implements TimeSeriesDriver {
     async deleteOlderThan(cutoff: Date) {
         await this.ensureSchema();
 
-        await this.getClient().command({
-            query: `
-				ALTER TABLE uptimekit.monitor_events
-				DELETE WHERE timestamp < toDateTime64({cutoff:UInt64} / 1000, 3)
-			`,
-            query_params: { cutoff: cutoff.getTime() },
-        });
-
-        await this.getClient().command({
-            query: `
-				ALTER TABLE uptimekit.monitor_changes
-				DELETE WHERE timestamp < toDateTime64({cutoff:UInt64} / 1000, 3)
-			`,
-            query_params: { cutoff: cutoff.getTime() },
-        });
+        // Lightweight deletes mask rows immediately and let merges reclaim the
+        // space, instead of the full-part rewrite that ALTER ... DELETE forces.
+        for (const table of [
+            "uptimekit.monitor_events",
+            "uptimekit.monitor_changes",
+        ] satisfies ClickHouseTimeSeriesTable[]) {
+            await this.getClient().command({
+                query: `
+					DELETE FROM ${table}
+					WHERE timestamp < toDateTime64({cutoff:UInt64} / 1000, 3)
+				`,
+                query_params: { cutoff: cutoff.getTime() },
+            });
+        }
     }
 
     async ping() {
