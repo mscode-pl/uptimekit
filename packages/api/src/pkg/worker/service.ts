@@ -107,6 +107,7 @@ type WorkerIncidentEventDispatch =
       };
 
 const monitorEventLocks = new Map<string, Promise<void>>();
+const MONITOR_GROUP_CONCURRENCY = 4;
 type TransactionLike = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type AutomaticIncidentTriggerStatus = "down" | "degraded";
 type EffectiveMonitorWorkers = Awaited<
@@ -245,6 +246,28 @@ function getAutomaticIncidentEscalatedMessage(input: {
     );
 
     return details.join(" ");
+}
+
+export async function mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    const runNext = async (): Promise<void> => {
+        while (nextIndex < items.length) {
+            const index = nextIndex++;
+            results[index] = await fn(items[index] as T);
+        }
+    };
+
+    await Promise.all(
+        Array.from({ length: Math.min(concurrency, items.length) }, runNext),
+    );
+
+    return results;
 }
 
 async function withMonitorEventLock<T>(
@@ -543,45 +566,53 @@ export async function processMonitorEvents(
         eventsByMonitor.set(event.monitorId, list);
     }
 
-    const processedGroups: ProcessedMonitorEventBatch[] = [];
-
-    for (const [monitorId, monitorEvents] of eventsByMonitor.entries()) {
-        const groupResult = await withMonitorEventLock(
+    // Groups touch disjoint monitors and each holds its own monitor lock, so
+    // they can run side by side; the cap keeps one batch from monopolizing
+    // the shared connection pool.
+    const processedGroups = await mapWithConcurrency(
+        [...eventsByMonitor.entries()],
+        MONITOR_GROUP_CONCURRENCY,
+        async ([
             monitorId,
-            async (tx) => {
-                const processedGroup = await processMonitorEventGroup({
-                    monitorId,
-                    monitorEvents,
-                    workerId,
-                    tx,
-                });
-
-                await persistProcessedMonitorEventGroup({
-                    processed: processedGroup,
-                    tx,
-                });
-
-                // Keep the relational result and its time-series recovery
-                // record in the same transaction so a process crash cannot
-                // commit one without the other.
-                const timeseriesOutboxId =
-                    await enqueueProcessedMonitorEventGroup({
-                        processed: processedGroup,
+            monitorEvents,
+        ]): Promise<ProcessedMonitorEventBatch> => {
+            const groupResult = await withMonitorEventLock(
+                monitorId,
+                async (tx) => {
+                    const processedGroup = await processMonitorEventGroup({
+                        monitorId,
                         monitorEvents,
                         workerId,
                         tx,
                     });
 
-                return { processedGroup, timeseriesOutboxId };
-            },
-        );
+                    await persistProcessedMonitorEventGroup({
+                        processed: processedGroup,
+                        tx,
+                    });
 
-        processedGroups.push({
-            processed: groupResult.processedGroup,
-            monitorEvents,
-            timeseriesOutboxId: groupResult.timeseriesOutboxId,
-        });
-    }
+                    // Keep the relational result and its time-series recovery
+                    // record in the same transaction so a process crash cannot
+                    // commit one without the other.
+                    const timeseriesOutboxId =
+                        await enqueueProcessedMonitorEventGroup({
+                            processed: processedGroup,
+                            monitorEvents,
+                            workerId,
+                            tx,
+                        });
+
+                    return { processedGroup, timeseriesOutboxId };
+                },
+            );
+
+            return {
+                processed: groupResult.processedGroup,
+                monitorEvents,
+                timeseriesOutboxId: groupResult.timeseriesOutboxId,
+            };
+        },
+    );
 
     await persistProcessedMonitorEventBatch({
         groups: processedGroups,

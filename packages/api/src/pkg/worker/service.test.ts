@@ -5,6 +5,7 @@ import {
     isAutomaticIncidentOpenEligible,
     isAutomaticIncidentResolveEligible,
     type MonitorEvent,
+    mapWithConcurrency,
 } from "./service";
 
 function toMap(
@@ -345,5 +346,31 @@ describe("worker event retry identity", () => {
         expect(getStableMonitorEventId(event, "worker-a")).toBe(
             id.toLowerCase(),
         );
+    });
+});
+
+describe("mapWithConcurrency", () => {
+    it("preserves order and never exceeds the concurrency limit", async () => {
+        let running = 0;
+        let maxRunning = 0;
+
+        const results = await mapWithConcurrency(
+            [5, 1, 4, 2, 3, 1, 2],
+            3,
+            async (delay) => {
+                running++;
+                maxRunning = Math.max(maxRunning, running);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                running--;
+                return delay * 10;
+            },
+        );
+
+        expect(results).toEqual([50, 10, 40, 20, 30, 10, 20]);
+        expect(maxRunning).toBe(3);
+    });
+
+    it("handles empty input", async () => {
+        expect(await mapWithConcurrency([], 4, async () => 1)).toEqual([]);
     });
 });
