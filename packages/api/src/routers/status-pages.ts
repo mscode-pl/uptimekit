@@ -150,6 +150,7 @@ export const statusPagesRouter = {
                         context.session.session.activeOrganizationId,
                     ),
                     public: !input.isPrivate,
+                    design: { theme: "dark" },
                 })
                 .returning();
 

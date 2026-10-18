@@ -82,13 +82,16 @@ function StatusPageRow({
                             />
                         )}
                     </span>
-                    <span className="flex items-center gap-1.5 font-medium text-muted-foreground text-xs">
+                    <a
+                        href={statusPageUrl}
+                        className="flex items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-primary"
+                    >
                         {statusPageUrl}
                         <FontAwesomeIcon
                             icon={faUpRightFromSquare}
                             className="h-3 w-3 opacity-50"
                         />
-                    </span>
+                    </a>
                 </div>
             </TableCell>
             <TableCell className="w-auto pr-1 md:w-[200px]">

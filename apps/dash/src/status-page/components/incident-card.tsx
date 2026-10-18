@@ -39,7 +39,7 @@ export function IncidentCard({
                 className,
             )}
         >
-            <div className="flex w-full items-center justify-between p-5 text-left transition-colors hover:bg-muted/50">
+            <div className="relative flex w-full items-center justify-between p-5 text-left transition-colors hover:bg-muted/50">
                 <div className="flex items-center gap-3">
                     <StatusDot status={getIncidentStatus(incident)} />
                     <div>
@@ -56,7 +56,7 @@ export function IncidentCard({
                     <Link
                         href={href as any}
                         aria-label={`View details for ${incident.title}`}
-                        className="rounded-full p-2 transition-colors hover:bg-muted"
+                        className="rounded-full p-2 transition-colors after:absolute after:inset-0 hover:bg-muted"
                     >
                         <FontAwesomeIcon
                             icon={faChevronDown}
@@ -72,7 +72,7 @@ export function IncidentCard({
                                 : "Expand incident"
                         }
                         onClick={display.onToggle}
-                        className="rounded-full p-2 transition-colors hover:bg-muted"
+                        className="rounded-full p-2 transition-colors after:absolute after:inset-0 hover:bg-muted"
                     >
                         {display.expanded ? (
                             <FontAwesomeIcon

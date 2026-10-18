@@ -1,7 +1,7 @@
 "use client";
 
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
-import { faUpDown, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCaretDown, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { parseAsString, useQueryState } from "nuqs";
 import * as React from "react";
@@ -304,7 +304,10 @@ export function ComboboxInput({
                     {...triggerProps}
                 >
                     <ComboboxPrimitive.Icon data-slot="combobox-icon">
-                        <FontAwesomeIcon icon={faUpDown} />
+                        <FontAwesomeIcon
+                            icon={faCaretDown}
+                            className="in-data-popup-open:rotate-180 transition-transform"
+                        />
                     </ComboboxPrimitive.Icon>
                 </ComboboxTrigger>
             )}

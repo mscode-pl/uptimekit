@@ -6,10 +6,12 @@ interface IncidentDetailCardProps {
 }
 
 export function IncidentDetailCard({ incident }: IncidentDetailCardProps) {
+    const isResolved = incident.endedAt !== null;
+
     return (
-        <div className="opacity-80">
+        <div className={isResolved ? "opacity-80" : undefined}>
             <div className="mb-2 font-medium text-muted-foreground text-sm tracking-wider">
-                Previous Incident Report
+                {isResolved ? "Previous Incident Report" : "Incident Report"}
             </div>
             <IncidentCard
                 incident={incident}

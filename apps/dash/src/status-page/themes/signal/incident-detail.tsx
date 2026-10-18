@@ -11,6 +11,9 @@ export default function SignalIncidentDetail({
     data,
 }: ThemeIncidentDetailProps) {
     const { config, incident, activeIssues } = data;
+    const otherActiveIssues = activeIssues.filter(
+        (issue) => issue.id !== incident.id,
+    );
     const { design } = config;
 
     return (
@@ -28,7 +31,7 @@ export default function SignalIncidentDetail({
             <main className="w-full flex-1">
                 <div className="mx-auto flex w-full max-w-[822px] flex-col gap-8 px-4 pt-12 pb-[60px]">
                     <BackLink href={buildPath("/", config.routeSlug)} />
-                    <CurrentIssuesBanner activeIssues={activeIssues} />
+                    <CurrentIssuesBanner activeIssues={otherActiveIssues} />
                     <DetailCard incident={incident} eyebrow="Incident report" />
                 </div>
             </main>

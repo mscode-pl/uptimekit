@@ -407,7 +407,7 @@ export default function MonitorDetailsPage() {
                 </>
             ) : (
                 <p className="flex items-center justify-center text-xl">
-                    External monitors dont have this available
+                    External monitor
                 </p>
             )}
         </div>

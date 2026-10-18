@@ -26,6 +26,7 @@ import {
     type UseFormReturn,
     useFieldArray,
     useForm,
+    useFormState,
     useWatch,
 } from "react-hook-form";
 import { sileo } from "sileo";
@@ -70,6 +71,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { SaveBar } from "@/components/ui/save-bar";
 import {
     Select,
     SelectContent,
@@ -80,7 +82,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { getRegionInfo, isFontAwesomeRegionFlag } from "@/lib/regions";
 import { cn } from "@/lib/utils";
@@ -502,7 +503,7 @@ const HttpJsonFields = ({ form }: { form: UseFormReturn<FormValues> }) => (
                     <FormLabel>JSONata Expression</FormLabel>
                     <FormControl>
                         <Input
-                            placeholder="$.message = 'Hello World'"
+                            placeholder='$.message == "Hello World"'
                             {...field}
                         />
                     </FormControl>
@@ -558,17 +559,20 @@ function getExternalStatusBadgeVariant(status: string) {
     return "outline";
 }
 
-function formatExternalStatus(status: string) {
-    return status
-        .toLowerCase()
-        .split(/[_\s-]+/)
-        .filter(Boolean)
-        .map((part) => part[0]?.toUpperCase() + part.slice(1))
-        .join(" ");
-}
+const EXTERNAL_STATUS_LABELS: Record<string, string> = {
+    OPERATIONAL: "Operational",
+    UNDERMAINTENANCE: "Under maintenance",
+    DEGRADEDPERFORMANCE: "Degraded performance",
+    PARTIALOUTAGE: "Partial outage",
+    MAJOROUTAGE: "Major outage",
+};
 
-function formatShortComponentId(id: string) {
-    return id.length > 12 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
+function formatExternalStatus(status: string) {
+    const normalized = status
+        .trim()
+        .toUpperCase()
+        .replace(/[_\s-]+/g, "");
+    return EXTERNAL_STATUS_LABELS[normalized] ?? "Unknown";
 }
 
 function isHttpStatusPageUrl(value: unknown) {
@@ -766,10 +770,8 @@ function InstatusComponentField({
                                                                     )}
                                                                 </Badge>
                                                             </div>
-                                                            <div className="truncate text-muted-foreground text-xs">
-                                                                {formatShortComponentId(
-                                                                    component.id,
-                                                                )}
+                                                            <div className="break-all font-mono text-muted-foreground text-xs">
+                                                                {component.id}
                                                             </div>
                                                         </div>
                                                     </SelectItem>
@@ -934,7 +936,7 @@ const HttpAdvancedFields = ({ form }: { form: UseFormReturn<FormValues> }) => {
                                 </FormDescription>
                             </div>
                             <FormControl>
-                                <Switch
+                                <Checkbox
                                     checked={field.value}
                                     onCheckedChange={field.onChange}
                                 />
@@ -1259,6 +1261,10 @@ function useCreateMonitorFormModel({
         defaultValues: getFormValuesFromInitialData(),
     });
 
+    // The form context is a spread copy of `form`; subscribing to errors here
+    // keeps that copy fresh so field errors clear once corrected.
+    useFormState({ control: form.control }).errors;
+
     const router = useRouter();
     const utils = useQueryClient();
 
@@ -1582,11 +1588,36 @@ function CreateMonitorFormFiltersSection7({
         toggleContinent,
         handleSelectAllWorkers,
     } = model;
+    const queryClient = useQueryClient();
+    const [tagQuery, setTagQuery] = useState("");
+    const { mutateAsync: createTagByName, isPending: isCreatingTag } =
+        useMutation({
+            mutationFn: (name: string) => client.monitors.createTag({ name }),
+            onSuccess: () =>
+                queryClient.invalidateQueries({
+                    queryKey: orpc.monitors.listTags.key(),
+                }),
+            onError: () => sileo.error({ title: "Failed to create tag" }),
+        });
+
     return (
         <FormField
             control={form.control}
             name="tags"
             render={({ field }) => {
+                const trimmedQuery = tagQuery.trim();
+                const canQuickCreate =
+                    trimmedQuery.length > 0 &&
+                    !(tags || []).some(
+                        (tag) =>
+                            tag.name.toLowerCase() ===
+                            trimmedQuery.toLowerCase(),
+                    );
+                const quickCreateTag = async () => {
+                    const created = await createTagByName(trimmedQuery);
+                    field.onChange([...(field.value || []), created.id]);
+                    setTagQuery("");
+                };
                 const selectedTags = (tags || []).filter((tag) =>
                     field.value?.includes(tag.id),
                 );
@@ -1615,6 +1646,7 @@ function CreateMonitorFormFiltersSection7({
 
                                 field.onChange(tagValues.map((tag) => tag.id));
                             }}
+                            onInputValueChange={setTagQuery}
                             multiple
                         >
                             <ComboboxChips>
@@ -1646,7 +1678,24 @@ function CreateMonitorFormFiltersSection7({
                                 </ComboboxValue>
                             </ComboboxChips>
                             <ComboboxPopup>
-                                <ComboboxEmpty>No tags found.</ComboboxEmpty>
+                                {canQuickCreate ? (
+                                    <button
+                                        type="button"
+                                        disabled={isCreatingTag}
+                                        onClick={quickCreateTag}
+                                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={faPlus}
+                                            className="h-4 w-4"
+                                        />
+                                        <span>Create "{trimmedQuery}"</span>
+                                    </button>
+                                ) : (
+                                    <ComboboxEmpty>
+                                        No tags found.
+                                    </ComboboxEmpty>
+                                )}
                                 <ComboboxList>
                                     {(tags || []).map((tag) => (
                                         <ComboboxItem key={tag.id} value={tag}>
@@ -1696,6 +1745,93 @@ function CreateMonitorFormFiltersSection7({
                 );
             }}
         />
+    );
+}
+
+function GroupCombobox({
+    value,
+    groupOptions,
+    onChange,
+    onOpenCreateDialog,
+}: {
+    value: string | null;
+    groupOptions: ReturnType<typeof buildGroupPaths<any>>;
+    onChange: (value: string | null) => void;
+    onOpenCreateDialog: () => void;
+}) {
+    const queryClient = useQueryClient();
+    const [query, setQuery] = useState("");
+    const { mutateAsync: createGroupByName, isPending } = useMutation({
+        mutationFn: (name: string) => client.monitors.createGroup({ name }),
+        onSuccess: () =>
+            queryClient.invalidateQueries({
+                queryKey: orpc.monitors.listGroups.key(),
+            }),
+        onError: () => sileo.error({ title: "Failed to create group" }),
+    });
+    const trimmedQuery = query.trim();
+    const canQuickCreate =
+        trimmedQuery.length > 0 &&
+        !groupOptions.some(
+            ({ path }) => path.toLowerCase() === trimmedQuery.toLowerCase(),
+        );
+    const itemIds = [
+        NONE_SELECT_VALUE,
+        ...groupOptions.map((option) => option.group.id),
+        CREATE_GROUP_SELECT_VALUE,
+    ];
+    const getLabel = (id: string) =>
+        id === CREATE_GROUP_SELECT_VALUE
+            ? "Create group"
+            : resolveGroupPathLabel(id, groupOptions, NO_GROUP_LABEL);
+
+    const quickCreateGroup = async () => {
+        const created = await createGroupByName(trimmedQuery);
+        onChange(created.id);
+        setQuery("");
+    };
+
+    return (
+        <Combobox
+            items={itemIds}
+            value={value ?? NONE_SELECT_VALUE}
+            itemToStringLabel={getLabel}
+            onValueChange={(next) => {
+                if (next === CREATE_GROUP_SELECT_VALUE) {
+                    onOpenCreateDialog();
+                    return;
+                }
+                onChange(next === NONE_SELECT_VALUE ? null : (next as string));
+            }}
+            onInputValueChange={setQuery}
+        >
+            <ComboboxInput
+                aria-label="Select group"
+                placeholder={NO_GROUP_LABEL}
+            />
+            <ComboboxPopup>
+                {canQuickCreate ? (
+                    <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={quickCreateGroup}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    >
+                        <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+                        <span>Create "{trimmedQuery}"</span>
+                    </button>
+                ) : (
+                    <ComboboxEmpty>No groups found.</ComboboxEmpty>
+                )}
+                <ComboboxList>
+                    {itemIds.map((id) => (
+                        <ComboboxItem key={id} value={id}>
+                            {getLabel(id)}
+                        </ComboboxItem>
+                    ))}
+                </ComboboxList>
+            </ComboboxPopup>
+        </Combobox>
     );
 }
 
@@ -1759,68 +1895,12 @@ function CreateMonitorFormContentSection6({
                     return (
                         <FormItem>
                             <FormLabel>Group</FormLabel>
-                            <Select
-                                onValueChange={(val) => {
-                                    if (val === CREATE_GROUP_SELECT_VALUE) {
-                                        setGroupsOpen(true);
-                                        return;
-                                    }
-
-                                    field.onChange(
-                                        val === NONE_SELECT_VALUE ? null : val,
-                                    );
-                                }}
-                                value={field.value || NONE_SELECT_VALUE}
-                            >
-                                <FormControl>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={NO_GROUP_LABEL}
-                                        >
-                                            {(value) =>
-                                                resolveGroupPathLabel(
-                                                    value as string,
-                                                    groupOptions,
-                                                    NO_GROUP_LABEL,
-                                                )
-                                            }
-                                        </SelectValue>
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value={NONE_SELECT_VALUE}>
-                                        {NO_GROUP_LABEL}
-                                    </SelectItem>
-                                    {groupOptions.map(
-                                        ({ group, path, depth }) => (
-                                            <SelectItem
-                                                key={group.id}
-                                                value={group.id}
-                                            >
-                                                <span
-                                                    style={{
-                                                        paddingLeft: depth * 12,
-                                                    }}
-                                                >
-                                                    {path}
-                                                </span>
-                                            </SelectItem>
-                                        ),
-                                    )}
-                                    <div className="my-1 border-t" />
-                                    <SelectItem
-                                        value={CREATE_GROUP_SELECT_VALUE}
-                                    >
-                                        <span className="flex items-center gap-2 text-muted-foreground">
-                                            <FontAwesomeIcon
-                                                icon={faPlus}
-                                                className="h-4 w-4"
-                                            />
-                                            <span>Create group</span>
-                                        </span>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <GroupCombobox
+                                value={field.value ?? null}
+                                groupOptions={groupOptions}
+                                onChange={field.onChange}
+                                onOpenCreateDialog={() => setGroupsOpen(true)}
+                            />
                             <div className="flex items-center gap-2">
                                 <Button
                                     type="button"
@@ -1915,9 +1995,7 @@ function CreateMonitorFormCardSection5({
                         form={form}
                         name="interval"
                         min={10}
-                        label={(value) =>
-                            `Heartbeat Interval (Check every ${formatSeconds(value)})`
-                        }
+                        label={(value) => "Heartbeat Interval"}
                         description={(value) => formatSeconds(value)}
                     />
 
@@ -3150,6 +3228,7 @@ function CreateMonitorFormFormSection2({
         toggleContinent,
         handleSelectAllWorkers,
     } = model;
+    const { isDirty } = useFormState({ control: form.control });
     return (
         <form
             onSubmit={form.handleSubmit(submitForm)}
@@ -3264,25 +3343,27 @@ function CreateMonitorFormFormSection2({
 
             <CreateMonitorFormContentSection8 model={model} />
 
-            <div className="bottom-0 z-10 flex flex justify-end gap-4 p-4">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleDiscard}
-                    disabled={isPending}
-                >
-                    Discard
-                </Button>
-                <Button type="button" onClick={handleSave} disabled={isPending}>
-                    {isPending
+            <SaveBar
+                visible={!monitorId || isDirty}
+                isPending={isPending}
+                message={
+                    monitorId
+                        ? "Careful — you have unsaved changes!"
+                        : "Ready to create this monitor?"
+                }
+                discardLabel={monitorId ? "Reset" : "Cancel"}
+                saveLabel={
+                    isPending
                         ? monitorId
                             ? "Updating..."
                             : "Creating..."
                         : monitorId
                           ? "Update Monitor"
-                          : "Create Monitor"}
-                </Button>
-            </div>
+                          : "Create Monitor"
+                }
+                onSave={handleSave}
+                onDiscard={handleDiscard}
+            />
         </form>
     );
 }

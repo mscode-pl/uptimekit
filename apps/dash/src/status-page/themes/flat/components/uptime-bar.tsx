@@ -43,7 +43,7 @@ const segmentColors = {
     major: "bg-orange-500",
     critical: "bg-red-500",
     maintenance: "bg-blue-500",
-    unknown: "bg-neutral-800",
+    unknown: "bg-status-unknown",
 };
 
 function SegmentTooltip({ day, toFixed }: { day: UptimeDay; toFixed: number }) {
@@ -95,7 +95,7 @@ function SegmentTooltip({ day, toFixed }: { day: UptimeDay; toFixed: number }) {
             )}
             {segs.unknown > 0 && (
                 <div className="flex items-center gap-1.5 text-[10px]">
-                    <div className="h-1.5 w-1.5 rounded-full bg-neutral-800" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-status-unknown" />
                     <span className="text-muted-foreground">Unknown</span>
                 </div>
             )}
@@ -238,7 +238,7 @@ export function UptimeBar({
                                     >
                                         {hoveredIndex === index ? (
                                             <div className="pointer-events-none absolute inset-x-0 top-3 bottom-0">
-                                                <div className="h-1.5 w-full rounded-full bg-black/16 dark:bg-white/18" />
+                                                <div className="h-1.5 w-full rounded-full bg-black/16 dark:bg-card/18" />
                                             </div>
                                         ) : null}
 

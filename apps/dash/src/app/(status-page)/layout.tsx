@@ -22,6 +22,8 @@ export default function StatusPageRootLayout({
                     defaultTheme="system"
                     enableSystem
                     disableTransitionOnChange
+                    // Status pages force their own light/dark mode; a separate key keeps that from leaking into the dashboard's saved preference
+                    storageKey="status-page-theme"
                 >
                     {children}
                 </ThemeProvider>

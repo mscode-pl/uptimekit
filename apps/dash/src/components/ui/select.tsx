@@ -4,9 +4,9 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { useRender } from "@base-ui/react/use-render";
 import {
+    faCaretDown,
     faChevronDown,
     faChevronUp,
-    faUpDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -31,7 +31,8 @@ const selectTriggerVariants = cva(
     },
 );
 
-export const selectTriggerIconClassName = "-me-1 size-4.5 opacity-80 sm:size-4";
+export const selectTriggerIconClassName =
+    "-me-1 size-4.5 opacity-80 transition-transform in-data-popup-open:rotate-180 sm:size-4";
 
 export interface SelectButtonProps extends useRender.ComponentProps<"button"> {
     size?: VariantProps<typeof selectTriggerVariants>["size"];
@@ -54,7 +55,7 @@ function SelectButton({
                     {children}
                 </span>
                 <FontAwesomeIcon
-                    icon={faUpDown}
+                    icon={faCaretDown}
                     className={selectTriggerIconClassName}
                 />
             </>
@@ -87,7 +88,7 @@ export function SelectTrigger({
             {children}
             <SelectPrimitive.Icon data-slot="select-icon">
                 <FontAwesomeIcon
-                    icon={faUpDown}
+                    icon={faCaretDown}
                     className={selectTriggerIconClassName}
                 />
             </SelectPrimitive.Icon>

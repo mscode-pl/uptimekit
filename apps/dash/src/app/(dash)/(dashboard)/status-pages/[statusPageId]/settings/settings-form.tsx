@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { SaveBar } from "@/components/ui/save-bar";
 import {
     Select,
     SelectItem,
@@ -332,31 +333,12 @@ export function SettingsForm({ statusPageId }: SettingsFormProps) {
                     baseDomain={statusPageBaseDomain}
                 />
             </form>
-            <div id="statuspage-settings-footer" className="">
-                <div className="flex justify-end gap-4 px-6 py-4">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleDiscard}
-                        disabled={updateStatusPage.isPending}
-                    >
-                        Discard
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={handleSaveChanges}
-                        disabled={updateStatusPage.isPending}
-                    >
-                        {updateStatusPage.isPending && (
-                            <FontAwesomeIcon
-                                icon={faSpinner}
-                                className="mr-2 h-4 w-4 animate-spin"
-                            />
-                        )}
-                        Save changes
-                    </Button>
-                </div>
-            </div>
+            <SaveBar
+                visible={form.formState.isDirty}
+                isPending={updateStatusPage.isPending}
+                onSave={handleSaveChanges}
+                onDiscard={handleDiscard}
+            />
         </Form>
     );
 }

@@ -49,6 +49,10 @@ export function isStatusPageHost(
 }
 
 export function getStatusPageRewritePath(pathname: string): string {
+    if (pathname === "/status" || pathname.startsWith("/status/")) {
+        return pathname;
+    }
+
     return pathname === "/" ? "/status" : `/status${pathname}`;
 }
 

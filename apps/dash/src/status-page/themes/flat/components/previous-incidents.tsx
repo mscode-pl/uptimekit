@@ -49,7 +49,7 @@ export function PreviousIncidents({
 
             <Link
                 href={buildPath("/updates", slug) as any}
-                className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 py-3 text-center font-medium text-muted-foreground text-sm transition-colors hover:bg-neutral-100 hover:text-foreground dark:hover:bg-neutral-700!"
+                className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-center font-medium text-muted-foreground text-sm transition-colors hover:bg-neutral-100 hover:text-foreground dark:hover:bg-neutral-700!"
             >
                 Previous updates
                 <svg

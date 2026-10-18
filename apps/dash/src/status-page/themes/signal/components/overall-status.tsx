@@ -1,4 +1,3 @@
-import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { cn } from "@/status-page/lib/utils";
 import { statusConfig } from "../../status-config";
@@ -45,8 +44,12 @@ export function OverallStatus({ status, className }: OverallStatusProps) {
             )}
         >
             <div className="signal-status-header relative z-[1] flex w-full select-none items-start gap-2 overflow-hidden rounded-xl p-3 min-[384px]:p-4">
-                <div className="shrink-0 p-1">
-                    <FontAwesomeIcon icon={faChevronDown} className="h-3 w-3" />
+                <div className="shrink-0 p-1" aria-hidden="true">
+                    <FontAwesomeIcon
+                        icon={statusConfig[status].icon}
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                    />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
                     <h1 className="min-w-0 flex-1 font-[550] text-sm leading-none min-[384px]:text-base">

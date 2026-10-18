@@ -35,6 +35,7 @@ import {
     InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
+import { SaveBar } from "@/components/ui/save-bar";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { setUserPassword } from "@/lib/actions/auth-actions";
@@ -53,8 +54,10 @@ const profileFormSchema = z.object({
         .or(z.literal("")),
 });
 
-async function submitProfile(values: z.infer<typeof profileFormSchema>) {
-    await authClient.updateUser(
+async function submitProfile(
+    values: z.infer<typeof profileFormSchema>,
+): Promise<boolean> {
+    const result = await authClient.updateUser(
         {
             name: values.name,
             image: values.image || "",
@@ -68,6 +71,7 @@ async function submitProfile(values: z.infer<typeof profileFormSchema>) {
             },
         },
     );
+    return !result.error;
 }
 
 const setPasswordSchema = z
@@ -162,10 +166,23 @@ function ProfileSettings({ session }: { session: any }) {
         },
     });
 
+    const savedValues = {
+        name: session.user.name,
+        image: session.user.image || "",
+    };
+
+    const onProfileSubmit = async (
+        values: z.infer<typeof profileFormSchema>,
+    ) => {
+        if (await submitProfile(values)) {
+            profileForm.reset(values);
+        }
+    };
+
     return (
         <Form {...profileForm}>
             <form
-                onSubmit={profileForm.handleSubmit(submitProfile)}
+                onSubmit={profileForm.handleSubmit(onProfileSubmit)}
                 className="space-y-10"
             >
                 {/* Public Profile Section */}
@@ -252,9 +269,14 @@ function ProfileSettings({ session }: { session: any }) {
                     </Card>
                 </div>
 
-                <div className="flex justify-end">
-                    <Button type="submit">Save Profile</Button>
-                </div>
+                <SaveBar
+                    visible={profileForm.formState.isDirty}
+                    isPending={profileForm.formState.isSubmitting}
+                    onSave={() =>
+                        void profileForm.handleSubmit(onProfileSubmit)()
+                    }
+                    onDiscard={() => profileForm.reset(savedValues)}
+                />
             </form>
         </Form>
     );
@@ -414,13 +436,22 @@ function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
                                     </FormItem>
                                 )}
                             />
-                            <div className="flex justify-end">
-                                <Button type="submit">
-                                    {hasPassword
+                            <SaveBar
+                                visible={passwordForm.formState.isDirty}
+                                isPending={passwordForm.formState.isSubmitting}
+                                message="Ready to change your password?"
+                                saveLabel={
+                                    hasPassword
                                         ? "Update Password"
-                                        : "Set Password"}
-                                </Button>
-                            </div>
+                                        : "Set Password"
+                                }
+                                onSave={() =>
+                                    void passwordForm.handleSubmit(
+                                        onPasswordSubmit,
+                                    )()
+                                }
+                                onDiscard={() => passwordForm.reset()}
+                            />
                         </form>
                     </Form>
                 </CardContent>

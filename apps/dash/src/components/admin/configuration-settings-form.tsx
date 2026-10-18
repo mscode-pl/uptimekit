@@ -1,11 +1,8 @@
 "use client";
 
-import { faSpinner } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { FormEvent } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { sileo } from "sileo";
-import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
@@ -15,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveBar } from "@/components/ui/save-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { client, orpc } from "@/utils/orpc";
 
@@ -70,6 +68,9 @@ export function ConfigurationSettingsForm() {
         data?.items.find((item) => item.key === "data_retention_days")?.value ||
         "30";
 
+    const formRef = useRef<HTMLFormElement>(null);
+    const [isDirty, setIsDirty] = useState(false);
+
     // Save mutation
     const saveMutation = useMutation({
         mutationFn: async (values: ConfigFormData) => {
@@ -92,12 +93,22 @@ export function ConfigurationSettingsForm() {
             await queryClient.invalidateQueries({
                 queryKey: orpc.configuration.list.key(),
             });
+            setIsDirty(false);
             sileo.success({ title: "Settings saved successfully" });
         },
         onError: (error: Error) => {
             sileo.error({ title: error.message });
         },
     });
+
+    const handleChange = (event: FormEvent<HTMLFormElement>) => {
+        const formData = new FormData(event.currentTarget);
+        setIsDirty(
+            getFormString(formData, "instanceName") !== instanceName ||
+                getFormString(formData, "dataRetentionDays") !==
+                    dataRetentionDays,
+        );
+    };
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -136,7 +147,9 @@ export function ConfigurationSettingsForm() {
             <CardContent>
                 <form
                     key={`${instanceName}:${dataRetentionDays}`}
+                    ref={formRef}
                     onSubmit={onSubmit}
+                    onChange={handleChange}
                     className="space-y-4"
                 >
                     <div className="space-y-2">
@@ -175,17 +188,15 @@ export function ConfigurationSettingsForm() {
                             cleanup.
                         </p>
                     </div>
-                    <div className="flex items-center justify-start pt-2">
-                        <Button type="submit" disabled={saveMutation.isPending}>
-                            {saveMutation.isPending && (
-                                <FontAwesomeIcon
-                                    icon={faSpinner}
-                                    className="mr-2 h-4 w-4 animate-spin"
-                                />
-                            )}
-                            Save Changes
-                        </Button>
-                    </div>
+                    <SaveBar
+                        visible={isDirty}
+                        isPending={saveMutation.isPending}
+                        onSave={() => formRef.current?.requestSubmit()}
+                        onDiscard={() => {
+                            formRef.current?.reset();
+                            setIsDirty(false);
+                        }}
+                    />
                 </form>
             </CardContent>
         </Card>

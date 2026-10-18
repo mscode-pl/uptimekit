@@ -7,10 +7,11 @@ import { Header } from "./components/header";
 import { IncidentDetailCard } from "./components/incident-detail-card";
 import "./style.css";
 
-export default function DefaultIncidentDetail({
-    data,
-}: ThemeIncidentDetailProps) {
+export default function FlatIncidentDetail({ data }: ThemeIncidentDetailProps) {
     const { config, incident, activeIssues } = data;
+    const otherActiveIssues = activeIssues.filter(
+        (issue) => issue.id !== incident.id,
+    );
     const { design } = config;
 
     return (
@@ -28,7 +29,7 @@ export default function DefaultIncidentDetail({
             <main className="w-full flex-1">
                 <div className="mx-auto max-w-3xl px-4 py-10">
                     <BackLink href={buildPath("/", config.routeSlug)} />
-                    <CurrentIssuesBanner activeIssues={activeIssues} />
+                    <CurrentIssuesBanner activeIssues={otherActiveIssues} />
                     <IncidentDetailCard incident={incident} />
                 </div>
             </main>

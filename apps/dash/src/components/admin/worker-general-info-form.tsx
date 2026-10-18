@@ -1,17 +1,14 @@
 "use client";
 
-import { faCheck, faRotateRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { sileo } from "sileo";
-import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
@@ -28,6 +25,7 @@ import {
 } from "@/components/ui/combobox";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { SaveBar } from "@/components/ui/save-bar";
 import {
     ALL_REGIONS,
     getRegionInfo,
@@ -50,6 +48,7 @@ export function WorkerGeneralInfoForm({ worker }: WorkerGeneralInfoFormProps) {
     const [name, setName] = useState(worker.name);
     const [selectedLocation, setSelectedLocation] = useState(worker.location);
 
+    const formRef = useRef<HTMLFormElement>(null);
     const router = useRouter();
     const queryClient = useQueryClient();
 
@@ -115,7 +114,7 @@ export function WorkerGeneralInfoForm({ worker }: WorkerGeneralInfoFormProps) {
 
     return (
         <Card>
-            <form onSubmit={handleSubmit}>
+            <form ref={formRef} onSubmit={handleSubmit}>
                 <CardHeader>
                     <CardTitle>General Information</CardTitle>
                     <CardDescription>Update worker details.</CardDescription>
@@ -240,28 +239,13 @@ export function WorkerGeneralInfoForm({ worker }: WorkerGeneralInfoFormProps) {
                         </FieldDescription>
                     </Field>
                 </CardContent>
-                <CardFooter className="justify-end gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={resetForm}
-                        disabled={isPending || !hasChanges}
-                    >
-                        <FontAwesomeIcon
-                            icon={faRotateRight}
-                            className="h-4 w-4"
-                        />
-                        Reset
-                    </Button>
-                    <Button
-                        type="submit"
-                        loading={isPending}
-                        disabled={!hasChanges || !trimmedName}
-                    >
-                        <FontAwesomeIcon icon={faCheck} className="h-4 w-4" />
-                        Save changes
-                    </Button>
-                </CardFooter>
+                <SaveBar
+                    visible={hasChanges}
+                    isPending={isPending}
+                    onSave={() => formRef.current?.requestSubmit()}
+                    onDiscard={resetForm}
+                    className="mx-6 mb-4"
+                />
             </form>
         </Card>
     );

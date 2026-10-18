@@ -59,7 +59,7 @@
 
     --accent: var(--color-neutral-700);
     --accent-foreground: var(--color-neutral-100);
-    --muted: var(--color-neutral-900);
+    --muted: #151821;
 
     --secondary: var(--color-neutral-700);
     --secondary-foreground: var(--color-neutral-200);
@@ -69,12 +69,8 @@
     --status-partial-outage: #fb923c;
     --status-major-outage: #ef4444;
     --status-maintenance: #8b5cf6;
-    --status-unknown: var(--color-neutral-700);
+    --status-unknown: var(--color-neutral-300);
     color-scheme: dark;
-}
-
-[data-theme="flat"].dark .bg-white {
-    background-color: var(--color-neutral-800);
 }
 
 [data-theme="flat"].dark h1,

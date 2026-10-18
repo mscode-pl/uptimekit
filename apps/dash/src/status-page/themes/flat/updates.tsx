@@ -8,7 +8,7 @@ import { Header } from "./components/header";
 import { UpdatesList } from "./components/updates-list";
 import "./style.css";
 
-export default function DefaultUpdates({ data }: ThemeUpdatesProps) {
+export default function FlatUpdates({ data }: ThemeUpdatesProps) {
     const { config, incidentsByDate, activeIssues, selectedPeriod } = data;
     const { design } = config;
     const updatesPath = buildPath("/updates", config.routeSlug);

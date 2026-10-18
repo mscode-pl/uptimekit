@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeftIcon } from "@/status-page/components/arrow-left-icon";
 
 export function BackLink({
     href,
@@ -12,7 +13,7 @@ export function BackLink({
             href={href as any}
             className="mb-8 inline-flex items-center gap-2 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
         >
-            <span aria-hidden="true">←</span>
+            <ArrowLeftIcon />
             {label}
         </Link>
     );

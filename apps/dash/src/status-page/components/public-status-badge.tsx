@@ -14,15 +14,15 @@ type StatusColorKey =
 const badgeStatus = {
     operational: { label: "All systems operational", color: "operational" },
     degraded: {
-        label: "Some systems are experiencing issues",
+        label: "Degraded",
         color: "degraded",
     },
     partial_outage: {
-        label: "Some systems are unavailable",
+        label: "Partial outage",
         color: "partialOutage",
     },
-    major_outage: { label: "Major system outage", color: "majorOutage" },
-    maintenance: { label: "Maintenance in progress", color: "maintenance" },
+    major_outage: { label: "Major outage", color: "majorOutage" },
+    maintenance: { label: "Maintenance", color: "maintenance" },
     maintenance_scheduled: {
         label: "Scheduled maintenance",
         color: "maintenance",

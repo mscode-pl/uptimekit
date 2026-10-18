@@ -42,7 +42,7 @@ const MonitorGroupItem = ({
     const statusText = getSectionStatusText(groupStatus, group.monitors.length);
 
     return (
-        <div className="rounded-xl border border-border bg-white">
+        <div className="rounded-xl border border-border bg-card">
             {group.group && isCollapsible ? (
                 <button
                     type="button"

@@ -58,12 +58,18 @@ export function MonitorListItem({
                             <Tooltip>
                                 <TooltipTrigger
                                     render={
-                                        <FontAwesomeIcon
-                                            icon={faCircleInfo}
-                                            className="h-4 w-4 text-muted-foreground/60"
+                                        <button
+                                            type="button"
+                                            className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            aria-label="More information"
                                         />
                                     }
-                                />
+                                >
+                                    <FontAwesomeIcon
+                                        icon={faCircleInfo}
+                                        className="h-4 w-4 text-muted-foreground/60"
+                                    />
+                                </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="max-w-xs text-sm">
                                         {description}
@@ -75,10 +81,11 @@ export function MonitorListItem({
                     <div
                         className={cn(
                             "font-medium text-sm",
-                            statusConfig[status].color,
+                            statusConfig[status]?.color ||
+                                "text-muted-foreground",
                         )}
                     >
-                        {statusConfig[status].label}
+                        {statusConfig[status]?.label || status || "Unknown"}
                     </div>
                 </div>
             </div>
@@ -104,12 +111,18 @@ export function MonitorListItem({
                         <Tooltip>
                             <TooltipTrigger
                                 render={
-                                    <FontAwesomeIcon
-                                        icon={faCircleInfo}
-                                        className="h-4 w-4 text-muted-foreground/60"
+                                    <button
+                                        type="button"
+                                        className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        aria-label="More information"
                                     />
                                 }
-                            />
+                            >
+                                <FontAwesomeIcon
+                                    icon={faCircleInfo}
+                                    className="h-4 w-4 text-muted-foreground/60"
+                                />
+                            </TooltipTrigger>
                             <TooltipContent>
                                 <p className="max-w-xs text-sm">
                                     {description}
@@ -121,7 +134,7 @@ export function MonitorListItem({
                 <div
                     className={cn(
                         "font-medium text-sm",
-                        statusConfig[status].color,
+                        statusConfig[status]?.color || "text-muted-foreground",
                     )}
                 >
                     {uptimePercentage.toFixed(toFixed)}% uptime

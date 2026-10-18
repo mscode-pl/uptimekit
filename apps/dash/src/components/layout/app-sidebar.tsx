@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    faCaretDown,
     faChevronDown,
     faGaugeHigh,
     faGear,
@@ -10,7 +11,6 @@ import {
     faShieldHalved,
     faSignal,
     faTriangleExclamation,
-    faUpDown,
     faUser,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -407,8 +407,8 @@ function UserMenuComponent() {
                     </span>
                 </div>
                 <FontAwesomeIcon
-                    icon={faUpDown}
-                    className="group-data-[collapsible=icon]:hidden! ml-auto size-4 shrink-0"
+                    icon={faCaretDown}
+                    className="group-data-[collapsible=icon]:hidden! ml-auto size-4 shrink-0 in-data-popup-open:rotate-180 transition-transform"
                 />
             </DropdownMenuTrigger>
             <DropdownMenuContent

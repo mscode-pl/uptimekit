@@ -8,7 +8,7 @@ import { OverallStatus } from "./components/overall-status";
 import { PreviousIncidents } from "./components/previous-incidents";
 import "./style.css";
 
-export default function DefaultTheme({ data }: ThemePageProps) {
+export default function FlatTheme({ data }: ThemePageProps) {
     const {
         config,
         overallStatus,
@@ -41,13 +41,14 @@ export default function DefaultTheme({ data }: ThemePageProps) {
                         />
                     </section>
 
+                    <ActiveIssuesSection activeIssues={activeIssues} />
+
                     <MonitorGroups
                         monitorGroups={monitorGroups}
                         layout={design.headerLayout}
                         barStyle={design.barStyle}
                         toFixed={design.percentDigits}
                     />
-                    <ActiveIssuesSection activeIssues={activeIssues} />
 
                     <ScheduledMaintenanceSection
                         scheduledMaintenances={scheduledMaintenances}

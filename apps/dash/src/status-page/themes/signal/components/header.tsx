@@ -81,6 +81,7 @@ export function Header({
                     <nav className="col-span-2 flex items-center justify-center gap-2 min-[768px]:col-span-1 min-[768px]:justify-self-center">
                         <Link
                             href={homeHref as any}
+                            aria-label="Overview"
                             className="inline-flex items-center justify-center gap-1 overflow-hidden rounded-lg bg-accent px-3 py-1.5 font-medium text-[14px] text-foreground leading-5"
                         >
                             <FontAwesomeIcon
@@ -96,6 +97,7 @@ export function Header({
                                 href={websiteUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                aria-label="Website"
                                 className="signal-button inline-flex items-center justify-center gap-1 overflow-hidden rounded-lg px-3 py-1.5 font-medium text-[14px] text-foreground leading-5"
                             >
                                 <FontAwesomeIcon
@@ -109,6 +111,7 @@ export function Header({
                         ) : null}
                         <Link
                             href={buildPath("/updates", slug) as any}
+                            aria-label="History"
                             className="signal-button inline-flex items-center justify-center gap-1 overflow-hidden rounded-lg px-3 py-1.5 font-medium text-[14px] text-foreground leading-5"
                         >
                             <FontAwesomeIcon

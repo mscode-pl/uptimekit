@@ -10,8 +10,8 @@ describe("buildPath", () => {
     });
 
     it("prefixes slug routes", () => {
-        expect(buildPath("/updates", "irazz")).toBe("/irazz/updates");
-        expect(buildPath("/", "irazz")).toBe("/irazz/");
+        expect(buildPath("/updates", "irazz")).toBe("/status/irazz/updates");
+        expect(buildPath("/", "irazz")).toBe("/status/irazz/");
     });
 });
 

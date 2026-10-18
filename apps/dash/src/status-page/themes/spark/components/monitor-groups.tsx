@@ -371,7 +371,7 @@ function MonitorGroupRow({
     const status = calculateAggregateStatus(
         group.monitors.map((monitor) => monitor.currentStatus),
     );
-    const name = group.group?.name ?? `Group ${index + 1}`;
+    const name = group.group?.name ?? "Services";
 
     return (
         <div
@@ -394,7 +394,9 @@ function MonitorGroupRow({
                         onClick={() => setIsOpen((current) => !current)}
                     >
                         {formatComponentCount(group.monitors.length)}
-                        <span className="spark-chevron spark-chevron-down" />
+                        {isCollapsible ? (
+                            <span className="spark-chevron spark-chevron-down" />
+                        ) : null}
                     </button>
                 </div>
                 <div
@@ -408,7 +410,7 @@ function MonitorGroupRow({
                 </div>
             </div>
 
-            <div className="spark-summary" aria-hidden={isOpen}>
+            <div className="spark-summary" inert={isOpen}>
                 <div className="spark-summary-inner">
                     {history.length ? (
                         <HistoryBars days={history} toFixed={toFixed} />
@@ -423,7 +425,7 @@ function MonitorGroupRow({
             <div
                 className="spark-component-panel"
                 data-open={isOpen}
-                aria-hidden={!isOpen}
+                inert={!isOpen}
             >
                 <div className="spark-component-panel-inner">
                     {group.monitors.map((monitor) => (

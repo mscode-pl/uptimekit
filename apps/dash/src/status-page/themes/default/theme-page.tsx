@@ -34,12 +34,10 @@ export default function DefaultTheme({ data }: ThemePageProps) {
             <main className="w-full flex-1">
                 <div className="mx-auto max-w-5xl px-4 py-12">
                     <section className="mb-16">
-                        <OverallStatus
-                            status={overallStatus}
-                            monitorGroups={monitorGroups}
-                            activeIssues={activeIssues}
-                        />
+                        <OverallStatus status={overallStatus} />
                     </section>
+
+                    <ActiveIssuesSection activeIssues={activeIssues} />
 
                     <MonitorGroups
                         monitorGroups={monitorGroups}
@@ -47,7 +45,6 @@ export default function DefaultTheme({ data }: ThemePageProps) {
                         barStyle={design.barStyle}
                         toFixed={design.percentDigits}
                     />
-                    <ActiveIssuesSection activeIssues={activeIssues} />
 
                     <ScheduledMaintenanceSection
                         scheduledMaintenances={scheduledMaintenances}

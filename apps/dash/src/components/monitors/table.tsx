@@ -3,6 +3,7 @@
 import {
     faArrowRight,
     faBomb,
+    faCaretDown,
     faCheck,
     faChevronDown,
     faChevronRight,
@@ -1981,8 +1982,8 @@ function MonitorsTableContentSection13({
                             >
                                 Actions
                                 <FontAwesomeIcon
-                                    icon={faChevronDown}
-                                    className="h-4 w-4"
+                                    icon={faCaretDown}
+                                    className="h-4 w-4 in-data-popup-open:rotate-180 transition-transform"
                                 />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">

@@ -1,6 +1,6 @@
 export function buildPath(basePath: string, slug?: string): string {
     if (slug) {
-        return `/${slug}${basePath}`;
+        return `/status/${slug}${basePath}`;
     }
     return basePath;
 }

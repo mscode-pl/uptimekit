@@ -11,12 +11,10 @@ import { useForm } from "react-hook-form";
 import { sileo } from "sileo";
 import { z } from "zod";
 import { ApiKeySettings } from "@/components/settings/api-key-settings";
-import { GroupSettings } from "@/components/settings/group-settings";
 import { LogoEditor } from "@/components/settings/logo-editor";
 import { OidcSettings } from "@/components/settings/oidc-settings";
 import { TagSettings } from "@/components/settings/tag-settings";
 import { TeamSettings } from "@/components/settings/team-settings";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
     Form,
@@ -28,6 +26,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { SaveBar } from "@/components/ui/save-bar";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
@@ -272,29 +271,12 @@ function OrganizationSettingsContent({
                                 </div>
 
                                 {canManageOrganization && (
-                                    <div className="sticky bottom-0 z-10 flex justify-end gap-4 border-t bg-background/80 p-4 backdrop-blur-sm">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            disabled={!form.formState.isDirty}
-                                            onClick={handleDiscard}
-                                        >
-                                            Discard
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            loading={
-                                                form.formState.isSubmitting
-                                            }
-                                            disabled={
-                                                !form.formState.isDirty ||
-                                                form.formState.isSubmitting
-                                            }
-                                            onClick={handleSave}
-                                        >
-                                            Save Changes
-                                        </Button>
-                                    </div>
+                                    <SaveBar
+                                        visible={form.formState.isDirty}
+                                        isPending={form.formState.isSubmitting}
+                                        onSave={handleSave}
+                                        onDiscard={handleDiscard}
+                                    />
                                 )}
                             </form>
                         </Form>
@@ -317,10 +299,6 @@ function OrganizationSettingsContent({
                             <ApiKeySettings />
                         </TabsPanel>
                     )}
-
-                    <TabsPanel value="groups">
-                        <GroupSettings readOnly={!canManageOrganization} />
-                    </TabsPanel>
 
                     <TabsPanel value="tags">
                         <TagSettings readOnly={!canManageOrganization} />

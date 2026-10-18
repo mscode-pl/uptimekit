@@ -80,7 +80,7 @@ export function Header({
                                 href={contactUrl}
                                 target={isMailto ? undefined : "_blank"}
                                 rel="noopener noreferrer"
-                                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-white px-4 font-medium text-foreground text-sm transition-colors hover:bg-neutral-100 dark:bg-muted dark:hover:bg-neutral-700!"
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-card px-4 font-medium text-foreground text-sm transition-colors hover:bg-neutral-100 dark:bg-muted dark:hover:bg-neutral-700!"
                             >
                                 Get in touch
                             </a>

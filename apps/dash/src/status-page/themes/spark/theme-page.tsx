@@ -55,6 +55,10 @@ function StatusBanner({
     };
     const message = messages[status];
     const config = statusConfig[status];
+    const showIssueTitle =
+        activeIssues.length > 0 &&
+        status !== "operational" &&
+        status !== "maintenance_completed";
 
     return (
         <section
@@ -81,7 +85,7 @@ function StatusBanner({
                 {message.title}
             </div>
             <div className="px-4 py-4 text-sm">
-                {activeIssues[0]?.title ?? message.description}
+                {showIssueTitle ? activeIssues[0].title : message.description}
             </div>
         </section>
     );

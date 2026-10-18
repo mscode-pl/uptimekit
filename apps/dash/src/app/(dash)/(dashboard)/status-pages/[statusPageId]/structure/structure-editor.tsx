@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveBar } from "@/components/ui/save-bar";
 import {
     Select,
     SelectContent,
@@ -466,6 +467,13 @@ function useStructureEditorState(statusPageId: string) {
         );
     };
 
+    const isDirty =
+        JSON.stringify(groups) !== JSON.stringify(toGroupItems(structure));
+
+    const handleDiscard = () => {
+        setGroups(toGroupItems(structure));
+    };
+
     const handleSave = () => {
         updateStructureMutation.mutate({
             id: statusPageId,
@@ -495,7 +503,9 @@ function useStructureEditorState(statusPageId: string) {
         handleDragEnd,
         handleDragOver,
         handleDragStart,
+        handleDiscard,
         handleSave,
+        isDirty,
         isMonitorsLoading,
         isPageLoading,
         isStructureLoading,
@@ -522,7 +532,9 @@ export function StructureEditor({ statusPageId }: StructureEditorProps) {
         handleDragEnd,
         handleDragOver,
         handleDragStart,
+        handleDiscard,
         handleSave,
+        isDirty,
         isMonitorsLoading,
         isPageLoading,
         isStructureLoading,
@@ -678,20 +690,13 @@ export function StructureEditor({ statusPageId }: StructureEditorProps) {
                 </div>
             </div>
 
-            <div className="sticky bottom-0 z-10 flex justify-end border-t bg-background/80 p-4 backdrop-blur-sm">
-                <Button
-                    onClick={handleSave}
-                    disabled={updateStructureMutation.isPending}
-                >
-                    {updateStructureMutation.isPending && (
-                        <FontAwesomeIcon
-                            icon={faSpinner}
-                            className="mr-2 h-4 w-4 animate-spin"
-                        />
-                    )}
-                    Save changes
-                </Button>
-            </div>
+            <SaveBar
+                visible={isDirty}
+                isPending={updateStructureMutation.isPending}
+                onSave={handleSave}
+                onDiscard={handleDiscard}
+                className="mx-4"
+            />
         </>
     );
 }

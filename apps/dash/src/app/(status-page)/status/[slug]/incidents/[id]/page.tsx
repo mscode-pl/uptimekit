@@ -38,7 +38,7 @@ export async function generateMetadata({
         const title = `${incident.title} - ${pageConfig.name}`;
         const description = `Incident status and updates for ${pageConfig.name}.`;
         const imageUrl = host
-            ? `${getProtocolFromHeaders(headersList)}://${host}/${slug}/incidents/${id}/og`
+            ? `${getProtocolFromHeaders(headersList)}://${host}/status/${slug}/incidents/${id}/og`
             : undefined;
 
         return {

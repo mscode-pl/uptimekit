@@ -51,7 +51,7 @@ export function Header({ config }: { config: StatusPageConfig }) {
                         rel="noopener noreferrer"
                         className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 font-semibold text-sm transition-colors hover:bg-muted"
                     >
-                        Report a problem
+                        Contact
                     </a>
                 ) : null}
                 <SubscribeForm

@@ -32,6 +32,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { SaveBar } from "@/components/ui/save-bar";
 import {
     Select,
     SelectContent,
@@ -526,29 +527,15 @@ function CreateIncidentFormFormSection1({
                 </Card>
             </div>
 
-            <div className="sticky bottom-0 z-10 flex justify-end gap-4 border-t bg-background/80 p-4 backdrop-blur-sm">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.back()}
-                    disabled={createIncident.isPending}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={createIncident.isPending}
-                >
-                    {createIncident.isPending && (
-                        <FontAwesomeIcon
-                            icon={faSpinner}
-                            className="mr-2 h-4 w-4 animate-spin"
-                        />
-                    )}
-                    Create Incident
-                </Button>
-            </div>
+            <SaveBar
+                visible
+                isPending={createIncident.isPending}
+                message="Ready to create this incident?"
+                discardLabel="Cancel"
+                saveLabel="Create Incident"
+                onSave={handleSave}
+                onDiscard={() => router.back()}
+            />
         </form>
     );
 }
