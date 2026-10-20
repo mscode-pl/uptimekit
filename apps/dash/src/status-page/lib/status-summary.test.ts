@@ -179,6 +179,18 @@ describe("buildStatusPageSummary", () => {
         ]);
     });
 
+    it("reports unknown page health instead of operational", () => {
+        const summary = buildStatusPageSummary({
+            data: { ...data, overallStatus: "unknown", monitorGroups: [] },
+            events: { reports: [], maintenances: [] },
+            origin: "https://status.example.com",
+            now,
+        });
+
+        expect(summary.status).toBe("unknown");
+        expect(summary.components).toEqual([]);
+    });
+
     it("serializes incidents without leaking monitors outside the page", () => {
         const [incident] = buildSummary().incidents;
 

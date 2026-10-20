@@ -106,15 +106,15 @@ The response includes the overall page status, the status of each component (mon
 }
 ```
 
-| Field                   | Values                                                  |
-| ----------------------- | ------------------------------------------------------- |
-| `status`                | `operational`, `degraded`, `outage`, `maintenance`      |
-| `components[].status`   | `up`, `down`, `degraded`, `maintenance`, `pending`      |
-| `incidents[].status`    | `investigating`, `identified`, `monitoring`, `resolved` |
-| `incidents[].severity`  | `minor`, `major`, `critical`                            |
-| `maintenances[].status` | `scheduled`, `in_progress`, `completed`                 |
+| Field                   | Values                                                        |
+| ----------------------- | ------------------------------------------------------------- |
+| `status`                | `operational`, `degraded`, `outage`, `maintenance`, `unknown` |
+| `components[].status`   | `up`, `down`, `degraded`, `maintenance`, `pending`            |
+| `incidents[].status`    | `investigating`, `identified`, `monitoring`, `resolved`       |
+| `incidents[].severity`  | `minor`, `major`, `critical`                                  |
+| `maintenances[].status` | `scheduled`, `in_progress`, `completed`                       |
 
-Component IDs are monitor IDs, and `componentIds` on incidents and maintenances reference them. All timestamps are ISO 8601 in UTC.
+Component IDs are monitor IDs, and `componentIds` on incidents and maintenances reference them. All timestamps are ISO 8601 in UTC. A page `status` of `unknown` means UptimeKit has no health data for it yet, so it should not be treated as operational.
 
 The endpoint sends `Access-Control-Allow-Origin: *` and is cached for 30 seconds. Password-protected status pages return `404`.
 

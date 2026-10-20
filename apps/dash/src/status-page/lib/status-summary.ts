@@ -16,7 +16,12 @@ const EVENT_QUERY_DAYS = 2;
 const SUMMARY_CACHE_TTL_MS = 15_000;
 
 type StatusPageEvents = Awaited<ReturnType<typeof getStatusPageEvents>>;
-type SummaryPageStatus = "operational" | "degraded" | "outage" | "maintenance";
+type SummaryPageStatus =
+    | "operational"
+    | "degraded"
+    | "outage"
+    | "maintenance"
+    | "unknown";
 type SummaryComponentStatus =
     | "up"
     | "down"
@@ -258,6 +263,8 @@ function toPageStatus(status: StatusType): SummaryPageStatus {
             return "degraded";
         case "maintenance":
             return "maintenance";
+        case "unknown":
+            return "unknown";
         default:
             return "operational";
     }
