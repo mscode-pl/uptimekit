@@ -10,6 +10,9 @@ import { buildPath, getRequestOrigin } from "./route-utils";
 import { createTtlCache } from "./ttl-cache";
 
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+// The event query uses calendar days, which can be shorter than 24 hours
+// across DST changes; fetch a wider range and apply the exact window here.
+const EVENT_QUERY_DAYS = 2;
 const SUMMARY_CACHE_TTL_MS = 15_000;
 
 type StatusPageEvents = Awaited<ReturnType<typeof getStatusPageEvents>>;
@@ -124,7 +127,7 @@ export async function renderStatusSummary({
         async () => {
             const [data, events] = await Promise.all([
                 getStatusPageData(pageConfig, routeSlug),
-                getStatusPageEvents(pageConfig.id, 1),
+                getStatusPageEvents(pageConfig.id, EVENT_QUERY_DAYS),
             ]);
 
             return buildStatusPageSummary({ data, events, origin, routeSlug });
